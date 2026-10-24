@@ -102,7 +102,7 @@ public final class AppViewModel: ObservableObject {
         let refDate = referenceDateOverride ?? Date()
         var current = newSnapshot
         if persist {
-            current = (try? store.save(newSnapshot, referenceDate: refDate)) ?? newSnapshot
+            current = (try? store.save(newSnapshot)) ?? newSnapshot
         }
         snapshot = current
         let (today, tomorrow) = engine.resolveTwoDayDashboard(
