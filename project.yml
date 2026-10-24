@@ -1,0 +1,91 @@
+# XcodeGen specification for Vibe 假期闹钟 (VibeAlarm)
+# Generate locally on macOS: brew install xcodegen && xcodegen generate && open VibeAlarm.xcodeproj
+# CI (.github/workflows/ci.yml) generates and builds it automatically.
+name: VibeAlarm
+options:
+  bundleIdPrefix: com.jstdlee
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: zh-Hans
+
+settings:
+  base:
+    VIBEALARM_BUNDLE_ID: com.jstdlee.vibealarm
+    DEVELOPMENT_TEAM: ""
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+
+packages:
+  VibeAlarmCore:
+    path: VibeAlarmCore
+
+targets:
+  VibeAlarm:
+    type: application
+    platform: iOS
+    sources:
+      - iOS/App
+      - iOS/Shared
+    dependencies:
+      - package: VibeAlarmCore
+      - target: VibeAlarmWidget
+        embed: true
+        codeSign: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(VIBEALARM_BUNDLE_ID)
+        INFOPLIST_KEY_CFBundleDisplayName: Vibe 假期闹钟
+    info:
+      path: iOS/App/Info.plist
+      properties:
+        CFBundleDisplayName: Vibe 假期闹钟
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleLocalizations: [zh-Hans, en]
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSCalendarsFullAccessUsageDescription: Vibe 假期闹钟仅在本地读取你的日历请假/休假日程以自动跳过假期早起闹钟，绝不上传任何日历数据。
+        NSCalendarsUsageDescription: Vibe 假期闹钟仅在本地读取你的日历请假/休假日程以自动跳过假期早起闹钟，绝不上传任何日历数据。
+        VibeAlarmAppGroup: group.$(VIBEALARM_BUNDLE_ID)
+        VibeAlarmKeychainGroup: $(VIBEALARM_BUNDLE_ID).byok
+    entitlements:
+      path: iOS/App/VibeAlarm.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(VIBEALARM_BUNDLE_ID)]
+
+  VibeAlarmWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - iOS/Widget
+      - iOS/Shared
+    dependencies:
+      - package: VibeAlarmCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(VIBEALARM_BUNDLE_ID).widget
+    info:
+      path: iOS/Widget/Info.plist
+      properties:
+        CFBundleDisplayName: Vibe 假期闹钟组件
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        VibeAlarmAppGroup: group.$(VIBEALARM_BUNDLE_ID)
+        VibeAlarmKeychainGroup: $(VIBEALARM_BUNDLE_ID).byok
+    entitlements:
+      path: iOS/Widget/VibeAlarmWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(VIBEALARM_BUNDLE_ID)]
+
+schemes:
+  VibeAlarm:
+    build:
+      targets:
+        VibeAlarm: all
+        VibeAlarmWidget: all

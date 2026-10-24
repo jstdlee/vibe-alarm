@@ -1,0 +1,77 @@
+name: Release
+
+# Push a tag like v0.1.0 to build the unsigned IPA and publish a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (e.g. v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install tools
+        run: brew install xcodegen xcbeautify
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v tag="$TAG" '
+            /^## / { on = (index($0, "## " tag " ") == 1 || $0 == "## " tag); next }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "## VibeAlarm $TAG" > notes.md
+          fi
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          UDID=$(scripts/pick-simulator.sh)
+          cd VibeAlarmCore
+          xcodebuild test -scheme VibeAlarmCore -destination "id=$UDID" | xcbeautify
+
+      - name: Build IPA (unsigned)
+        run: |
+          set -o pipefail
+          xcodegen generate
+          VERSION="${TAG#v}"
+          xcodebuild build -project VibeAlarm.xcodeproj -scheme VibeAlarm -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build/release \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" | xcbeautify
+          mkdir -p dist/Payload
+          cp -R build/release/Build/Products/Release-iphoneos/VibeAlarm.app dist/Payload/
+          (cd dist && zip -qry "VibeAlarm-$TAG.ipa" Payload && rm -rf Payload)
+          (cd dist && shasum -a 256 "VibeAlarm-$TAG.ipa" > "VibeAlarm-$TAG.ipa.sha256")
+          ls -la dist
+
+      - name: Publish release page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" dist/* --title "VibeAlarm $TAG" --notes-file notes.md
+          fi

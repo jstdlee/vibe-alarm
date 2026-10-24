@@ -1,0 +1,13 @@
+.build/
+.build-linux/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+build/
+dist/
+.DS_Store
+iOS/App/Info.plist
+iOS/App/VibeAlarm.entitlements
+iOS/Widget/Info.plist
+iOS/Widget/VibeAlarmWidget.entitlements
