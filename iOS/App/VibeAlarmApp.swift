@@ -139,12 +139,12 @@ struct WidgetAndBedtimeShowcaseView: View {
                 Text("\(day.displayLabel) · \(day.weekdayText)")
                     .font(.caption.weight(.semibold))
             }
-            .foregroundStyle(isTomorrow ? .orange : .secondary)
+            .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
 
             Text(day.effectiveTime ?? day.baseTime)
                 .font(.system(size: 34, weight: .light))
                 .monospacedDigit()
-                .foregroundStyle(day.status.isRinging ? .white : Color(uiColor: .tertiaryLabel))
+                .foregroundStyle(day.status.isRinging ? Color.white : Color(uiColor: .tertiaryLabel))
 
             Text(day.status.isRinging ? day.reasonBadge : "不响铃 · \(day.reasonBadge)")
                 .font(.caption2)

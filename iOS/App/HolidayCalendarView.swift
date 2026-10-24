@@ -131,7 +131,7 @@ public struct HolidayCalendarView: View {
                             Spacer()
                             Text(entry.kind.shortBadge)
                                 .font(.footnote.weight(.medium))
-                                .foregroundStyle(entry.kind == .makeupWorkday ? .orange : .secondary)
+                                .foregroundStyle(entry.kind == .makeupWorkday ? Color.orange : Color.secondary)
                         }
                         .swipeActions {
                             Button(role: .destructive) {

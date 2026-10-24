@@ -91,7 +91,7 @@ public struct BYOKInputSheet: View {
                                 Spacer()
                                 Text(entry.kind.displayTitle)
                                     .font(.footnote)
-                                    .foregroundStyle(entry.kind == .makeupWorkday ? .orange : .secondary)
+                                    .foregroundStyle(entry.kind == .makeupWorkday ? Color.orange : Color.secondary)
                             }
                         }
 

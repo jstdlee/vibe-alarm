@@ -136,7 +136,7 @@ public struct DualThumbTimeDialView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 7)
                                     .background(active ? Color.orange : Color(uiColor: .tertiarySystemFill))
-                                    .foregroundStyle(active ? .black : .white)
+                                    .foregroundStyle(active ? Color.black : Color.white)
                                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
                             .buttonStyle(.plain)

@@ -85,7 +85,7 @@ struct VibeAlarmWidgetEntryView: View {
             Text(entry.tomorrow.effectiveTime ?? entry.tomorrow.baseTime)
                 .font(.system(size: 34, weight: .light))
                 .monospacedDigit()
-                .foregroundStyle(entry.tomorrow.status.isRinging ? .white : .secondary)
+                .foregroundStyle(entry.tomorrow.status.isRinging ? Color.white : Color.secondary)
 
             Text(entry.tomorrow.status.isRinging ? entry.tomorrow.reasonBadge : "不响铃 · \(entry.tomorrow.reasonBadge)")
                 .font(.caption2)
@@ -157,7 +157,7 @@ struct VibeAlarmWidgetEntryView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(entry.tomorrow.hasManualOverride ? .orange : .secondary)
+                .tint(entry.tomorrow.hasManualOverride ? Color.orange : Color.secondary)
             }
         }
     }
@@ -170,12 +170,12 @@ struct VibeAlarmWidgetEntryView: View {
                 Text("\(day.displayLabel) · \(day.weekdayText)")
                     .font(.caption.weight(.semibold))
             }
-            .foregroundStyle(isTomorrow ? .orange : .secondary)
+            .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
 
             Text(day.effectiveTime ?? day.baseTime)
                 .font(.system(size: 32, weight: .light))
                 .monospacedDigit()
-                .foregroundStyle(day.status.isRinging ? .white : .secondary)
+                .foregroundStyle(day.status.isRinging ? Color.white : Color.secondary)
 
             Text(day.status.isRinging ? day.reasonBadge : "不响铃 · \(day.reasonBadge)")
                 .font(.caption2)

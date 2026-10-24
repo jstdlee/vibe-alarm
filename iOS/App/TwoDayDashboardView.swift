@@ -171,7 +171,7 @@ public struct TwoDayDashboardView: View {
                     HStack(spacing: 6) {
                         Text("\(day.displayLabel) · \(day.weekdayText)")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(isTomorrow ? .orange : .secondary)
+                            .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
                         Text("(\(day.date.suffix(5)))")
                             .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
@@ -182,7 +182,7 @@ public struct TwoDayDashboardView: View {
                         Text(day.effectiveTime ?? day.baseTime)
                             .font(.system(size: 56, weight: .light))
                             .monospacedDigit()
-                            .foregroundStyle(day.status.isRinging ? .white : Color(uiColor: .tertiaryLabel))
+                            .foregroundStyle(day.status.isRinging ? Color.white : Color(uiColor: .tertiaryLabel))
 
                         if let eff = day.effectiveTime, eff != day.baseTime, day.status.isRinging {
                             Text("原定 \(day.baseTime)")
@@ -194,7 +194,7 @@ public struct TwoDayDashboardView: View {
                     // Clean status subtitle
                     Text(statusSubtitle(for: day))
                         .font(.subheadline)
-                        .foregroundStyle(day.status.isRinging ? .secondary : .orange)
+                        .foregroundStyle(day.status.isRinging ? Color.secondary : Color.orange)
                 }
 
                 Spacer()
