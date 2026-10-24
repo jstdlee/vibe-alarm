@@ -2,10 +2,45 @@ import SwiftUI
 import UIKit
 import VibeAlarmCore
 
-/// Ergonomic Dual-Thumb Time Dial:
-/// - Left column: Left thumb vertical drag wheel for Hour (`00`–`23`)
-/// - Right column: Right thumb vertical drag wheel for Minute (`00`–`59`)
-/// - Bottom section: Repeat mode, custom weekdays / specific dates, and smart holiday switches.
+/// Native Apple Clock ("编辑闹钟") Modal Sheet featuring the ergonomic Dual-Thumb Drum Picker:
+/// - Left column: Left thumb vertical drum wheel for Hour (`00`–`23`)
+/// - Right column: Right thumb vertical drum wheel for Minute (`00`–`59`)
+/// - Signature iOS center selection highlight bar (`tertiarySystemFill`, cornerRadius 8)
+/// - Below: Standard iOS `.insetGrouped` Form rows for Repeat Mode, Specific Dates, Label, and Smart Holiday Switches.
+public struct DualThumbTimeDialSheet: View {
+    @ObservedObject var viewModel: AppViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    public init(viewModel: AppViewModel) {
+        self.viewModel = viewModel
+    }
+
+    public var body: some View {
+        NavigationStack {
+            DualThumbTimeDialView(viewModel: viewModel)
+                .navigationTitle("编辑闹钟")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("取消") {
+                            dismiss()
+                        }
+                        .foregroundStyle(.orange)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("存储") {
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.orange)
+                    }
+                }
+        }
+        .tint(.orange)
+        .preferredColorScheme(.dark)
+    }
+}
+
 public struct DualThumbTimeDialView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var newSpecificDate: Date = Date()
@@ -15,323 +50,187 @@ public struct DualThumbTimeDialView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                Label("左右手双转盘设定", systemImage: "hand.draw.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.orange)
-                Spacer()
-                Toggle("", isOn: Binding(
-                    get: { viewModel.snapshot.alarmRule.isEnabled },
-                    set: { enabled in viewModel.updateAlarmRule { $0.isEnabled = enabled } }
-                ))
-                .labelsHidden()
-                .tint(.orange)
-            }
+        List {
+            // Section 1: Apple Drum-Style Dual-Thumb Picker
+            Section {
+                VStack(spacing: 12) {
+                    ZStack {
+                        // Signature Apple Picker Center Selection Highlight Bar
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color(uiColor: .tertiarySystemFill))
+                            .frame(height: 38)
 
-            // Dual-Thumb Ergonomic Drum Wheels (Left Hand = Hour, Right Hand = Minute)
-            HStack(spacing: 14) {
-                ThumbDrumColumn(
-                    title: "左手划 · 时 (HOUR)",
-                    value: viewModel.snapshot.alarmRule.hour,
-                    modulo: 24,
-                    accentColor: .orange
-                ) { newHour in
-                    viewModel.updateAlarmTime(
-                        hour: newHour,
-                        minute: viewModel.snapshot.alarmRule.minute
-                    )
-                }
-
-                Text(":")
-                    .font(.system(size: 38, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.65))
-
-                ThumbDrumColumn(
-                    title: "右手划 · 分 (MIN)",
-                    value: viewModel.snapshot.alarmRule.minute,
-                    modulo: 60,
-                    accentColor: .cyan
-                ) { newMinute in
-                    viewModel.updateAlarmTime(
-                        hour: viewModel.snapshot.alarmRule.hour,
-                        minute: newMinute
-                    )
-                }
-            }
-
-            // Quick Minute Step Pills for Right Thumb
-            HStack(spacing: 8) {
-                Text("快捷分:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach([0, 15, 30, 45], id: \.self) { presetMin in
-                    Button {
-                        triggerHaptic()
-                        viewModel.updateAlarmTime(
-                            hour: viewModel.snapshot.alarmRule.hour,
-                            minute: presetMin
-                        )
-                    } label: {
-                        Text(String(format: ":%02d", presetMin))
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                viewModel.snapshot.alarmRule.minute == presetMin
-                                    ? Color.cyan.opacity(0.28)
-                                    : Color.white.opacity(0.08)
-                            )
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer()
-                Button {
-                    triggerHaptic()
-                    let (_, newM) = AlarmScheduleEngine.addMinutes(
-                        hour: viewModel.snapshot.alarmRule.hour,
-                        minute: viewModel.snapshot.alarmRule.minute,
-                        delta: 5
-                    )
-                    viewModel.updateAlarmTime(hour: viewModel.snapshot.alarmRule.hour, minute: newM)
-                } label: {
-                    Text("+5m")
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.orange.opacity(0.22))
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-
-            Divider().overlay(Color.white.opacity(0.12))
-
-            // Repeat Mode & Date Selector (下方设定重复和日期)
-            repeatAndDateSection
-
-            Divider().overlay(Color.white.opacity(0.12))
-
-            // Smart Holiday & Bedtime Toggles
-            smartTogglesSection
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(red: 0.11, green: 0.13, blue: 0.20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-        )
-    }
-
-    // MARK: - Repeat Mode & Specific Date Section
-
-    private var repeatAndDateSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("重复周期与指定日期", systemImage: "repeat")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(viewModel.snapshot.alarmRule.repeatMode.summaryText)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.orange)
-            }
-
-            // 4 Mode Pills
-            HStack(spacing: 6) {
-                repeatModePill(title: "智能工作日", isSelected: isWeekdaysMode) {
-                    viewModel.updateAlarmRule { $0.repeatMode = .weekdays }
-                }
-                repeatModePill(title: "每天", isSelected: isEverydayMode) {
-                    viewModel.updateAlarmRule { $0.repeatMode = .everyday }
-                }
-                repeatModePill(title: "自定义周", isSelected: isCustomDaysMode) {
-                    if !isCustomDaysMode {
-                        viewModel.updateAlarmRule { $0.repeatMode = .customDays(Weekday.standardWeekdays) }
-                    }
-                }
-                repeatModePill(title: "指定日期", isSelected: isSpecificDatesMode) {
-                    if !isSpecificDatesMode {
-                        let tomorrowStr = viewModel.tomorrowAlarm.date
-                        viewModel.updateAlarmRule { $0.repeatMode = .specificDates([tomorrowStr]) }
-                    }
-                }
-            }
-
-            // Conditional Sub-Selector: Custom Weekdays OR Specific Dates
-            if case .customDays(let selectedDays) = viewModel.snapshot.alarmRule.repeatMode {
-                HStack(spacing: 6) {
-                    ForEach([Weekday.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday], id: \.self) { day in
-                        let active = selectedDays.contains(day)
-                        Button {
-                            triggerHaptic()
-                            var next = selectedDays
-                            if active {
-                                next.remove(day)
-                            } else {
-                                next.insert(day)
+                        HStack(spacing: 0) {
+                            AppleDrumColumn(
+                                value: viewModel.snapshot.alarmRule.hour,
+                                modulo: 24,
+                                unitLabel: "时"
+                            ) { newHour in
+                                viewModel.updateAlarmTime(
+                                    hour: newHour,
+                                    minute: viewModel.snapshot.alarmRule.minute
+                                )
                             }
-                            viewModel.updateAlarmRule { $0.repeatMode = .customDays(next) }
-                        } label: {
-                            Text(day.compactLabel)
-                                .font(.caption.weight(.bold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(active ? Color.orange : Color.white.opacity(0.08))
-                                .foregroundStyle(active ? .black : .white)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                            AppleDrumColumn(
+                                value: viewModel.snapshot.alarmRule.minute,
+                                modulo: 60,
+                                unitLabel: "分"
+                            ) { newMinute in
+                                viewModel.updateAlarmTime(
+                                    hour: viewModel.snapshot.alarmRule.hour,
+                                    minute: newMinute
+                                )
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
+                    .frame(height: 196)
                 }
+                .padding(.vertical, 4)
+            } footer: {
+                Text("左右分栏滚轮支持双手拇指分别上下滑动调节「时」与「分」。")
             }
 
-            if case .specificDates(let dates) = viewModel.snapshot.alarmRule.repeatMode {
-                VStack(alignment: .leading, spacing: 8) {
+            // Section 2: Repeat & Date Rules (下方设定重复和日期)
+            Section {
+                Picker("重复", selection: Binding(
+                    get: { repeatModeTag },
+                    set: { newTag in
+                        switch newTag {
+                        case 0:
+                            viewModel.updateAlarmRule { $0.repeatMode = .weekdays }
+                        case 1:
+                            viewModel.updateAlarmRule { $0.repeatMode = .everyday }
+                        case 2:
+                            viewModel.updateAlarmRule { $0.repeatMode = .customDays(Weekday.standardWeekdays) }
+                        case 3:
+                            let tomorrowStr = viewModel.tomorrowAlarm.date
+                            viewModel.updateAlarmRule { $0.repeatMode = .specificDates([tomorrowStr]) }
+                        default:
+                            break
+                        }
+                    }
+                )) {
+                    Text("法定工作日").tag(0)
+                    Text("每天").tag(1)
+                    Text("自定义星期").tag(2)
+                    Text("指定日期").tag(3)
+                }
+
+                if case .customDays(let selectedDays) = viewModel.snapshot.alarmRule.repeatMode {
+                    HStack(spacing: 6) {
+                        ForEach([Weekday.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday], id: \.self) { day in
+                            let active = selectedDays.contains(day)
+                            Button {
+                                triggerHaptic()
+                                var next = selectedDays
+                                if active {
+                                    next.remove(day)
+                                } else {
+                                    next.insert(day)
+                                }
+                                viewModel.updateAlarmRule { $0.repeatMode = .customDays(next) }
+                            } label: {
+                                Text(day.compactLabel)
+                                    .font(.subheadline.weight(.medium))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 7)
+                                    .background(active ? Color.orange : Color(uiColor: .tertiarySystemFill))
+                                    .foregroundStyle(active ? .black : .white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+
+                if case .specificDates(let dates) = viewModel.snapshot.alarmRule.repeatMode {
                     HStack {
                         DatePicker(
-                            "选择日期",
+                            "添加日期",
                             selection: $newSpecificDate,
                             displayedComponents: .date
                         )
-                        .labelsHidden()
-                        .colorScheme(.dark)
-
-                        Button {
+                        Spacer()
+                        Button("添加") {
                             triggerHaptic()
                             let dStr = AlarmScheduleEngine().dateString(from: newSpecificDate)
                             var next = dates
                             next.insert(dStr)
                             viewModel.updateAlarmRule { $0.repeatMode = .specificDates(next) }
-                        } label: {
-                            Label("添加日期", systemImage: "plus.circle.fill")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.orange.opacity(0.25))
-                                .clipShape(Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .foregroundStyle(.orange)
                     }
 
-                    if !dates.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(dates.sorted(), id: \.self) { dStr in
-                                    HStack(spacing: 4) {
-                                        Text(dStr)
-                                            .font(.caption2.weight(.semibold))
-                                        Button {
-                                            var next = dates
-                                            next.remove(dStr)
-                                            viewModel.updateAlarmRule { $0.repeatMode = .specificDates(next) }
-                                        } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.caption2)
-                                        }
-                                    }
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.white.opacity(0.12))
-                                    .clipShape(Capsule())
-                                }
+                    ForEach(dates.sorted(), id: \.self) { dStr in
+                        HStack {
+                            Text(dStr)
+                                .font(.body.monospacedDigit())
+                            Spacer()
+                            Button(role: .destructive) {
+                                var next = dates
+                                next.remove(dStr)
+                                viewModel.updateAlarmRule { $0.repeatMode = .specificDates(next) }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.red)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
-            }
-        }
-    }
 
-    // MARK: - Smart Holiday & Bedtime Toggles
-
-    private var smartTogglesSection: some View {
-        VStack(spacing: 10) {
-            Toggle(isOn: Binding(
-                get: { viewModel.snapshot.alarmRule.skipPublicHolidays },
-                set: { val in viewModel.updateAlarmRule { $0.skipPublicHolidays = val } }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("智能公共假期跳过 & 调休补班响铃")
-                        .font(.footnote.weight(.medium))
-                    Text("自动跳过法定假日；遇到周末调休补班自动开启闹钟")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                HStack {
+                    Text("标签")
+                    Spacer()
+                    TextField("起床", text: Binding(
+                        get: { viewModel.snapshot.alarmRule.label },
+                        set: { val in viewModel.updateAlarmRule { $0.label = val } }
+                    ))
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(.secondary)
                 }
             }
-            .tint(.orange)
 
-            Toggle(isOn: Binding(
-                get: { viewModel.snapshot.alarmRule.skipPersonalLeave },
-                set: { val in viewModel.updateAlarmRule { $0.skipPersonalLeave = val } }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("结合个人休假 (本地日历 / BYOK 录入)")
-                        .font(.footnote.weight(.medium))
-                    Text("检测到年假/请假/PTO 自动跳过，不打扰休假睡眠")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .tint(.mint)
+            // Section 3: Smart Holiday & Bedtime Settings
+            Section {
+                Toggle("法定节假日跳过 & 调休补班响铃", isOn: Binding(
+                    get: { viewModel.snapshot.alarmRule.skipPublicHolidays },
+                    set: { val in viewModel.updateAlarmRule { $0.skipPublicHolidays = val } }
+                ))
+                .tint(.green)
 
-            HStack {
-                Toggle(isOn: Binding(
+                Toggle("个人休假自动跳过", isOn: Binding(
+                    get: { viewModel.snapshot.alarmRule.skipPersonalLeave },
+                    set: { val in viewModel.updateAlarmRule { $0.skipPersonalLeave = val } }
+                ))
+                .tint(.green)
+
+                Toggle("睡前确认提醒 (\(viewModel.snapshot.alarmRule.formattedBedtimeReminder))", isOn: Binding(
                     get: { viewModel.snapshot.alarmRule.bedtimeReminderEnabled },
                     set: { val in viewModel.updateAlarmRule { $0.bedtimeReminderEnabled = val } }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("睡前通知提醒明日闹钟 (\(viewModel.snapshot.alarmRule.formattedBedtimeReminder))")
-                            .font(.footnote.weight(.medium))
-                        Text("长按通知可直接选「跳过明日」「推迟」或「保持」")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .tint(.cyan)
+                ))
+                .tint(.green)
+            } header: {
+                Text("智能假期规则")
+                    .textCase(nil)
+            } footer: {
+                Text("开启后自动识别公共假期、周末调休补班及本地日历中的请假日程。")
             }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
-    private var isWeekdaysMode: Bool {
-        if case .weekdays = viewModel.snapshot.alarmRule.repeatMode { return true }
-        return false
-    }
-
-    private var isEverydayMode: Bool {
-        if case .everyday = viewModel.snapshot.alarmRule.repeatMode { return true }
-        return false
-    }
-
-    private var isCustomDaysMode: Bool {
-        if case .customDays = viewModel.snapshot.alarmRule.repeatMode { return true }
-        return false
-    }
-
-    private var isSpecificDatesMode: Bool {
-        if case .specificDates = viewModel.snapshot.alarmRule.repeatMode { return true }
-        return false
-    }
-
-    private func repeatModePill(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            triggerHaptic()
-            action()
-        } label: {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(isSelected ? Color.orange : Color.white.opacity(0.08))
-                .foregroundStyle(isSelected ? .black : .white)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    private var repeatModeTag: Int {
+        switch viewModel.snapshot.alarmRule.repeatMode {
+        case .weekdays: return 0
+        case .everyday: return 1
+        case .customDays: return 2
+        case .specificDates: return 3
         }
-        .buttonStyle(.plain)
     }
 
     private func triggerHaptic() {
@@ -340,91 +239,88 @@ public struct DualThumbTimeDialView: View {
     }
 }
 
-// MARK: - Single Thumb Drum Wheel Column (Vertical Drag + Curved Cylinder Slots)
+// MARK: - Apple Native-Style Drum Wheel Column
 
-private struct ThumbDrumColumn: View {
-    let title: String
+private struct AppleDrumColumn: View {
     let value: Int
     let modulo: Int
-    let accentColor: Color
+    let unitLabel: String
     let onChange: (Int) -> Void
 
     @State private var dragStartValue: Int?
     @State private var visualOffset: CGFloat = 0
 
-    private let stepHeight: CGFloat = 26
+    private let stepHeight: CGFloat = 28
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text(title)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(accentColor)
+        ZStack {
+            VStack(spacing: 4) {
+                ForEach([-3, -2, -1, 0, 1, 2, 3], id: \.self) { delta in
+                    let slotVal = wrapped(value + delta)
+                    let isCenter = delta == 0
+                    let distance = CGFloat(abs(delta))
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.black.opacity(0.38))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(accentColor.opacity(0.35), lineWidth: 1.2)
-                    )
-
-                // Center selection highlight band
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(accentColor.opacity(0.16))
-                    .frame(height: 50)
-                    .padding(.horizontal, 8)
-
-                // 5 visible drum slots (-2, -1, 0, +1, +2)
-                VStack(spacing: 4) {
-                    ForEach([-2, -1, 0, 1, 2], id: \.self) { delta in
-                        let slotVal = wrapped(value + delta)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(String(format: "%02d", slotVal))
                             .font(.system(
-                                size: delta == 0 ? 36 : (abs(delta) == 1 ? 20 : 14),
-                                weight: delta == 0 ? .heavy : .semibold,
-                                design: .rounded
+                                size: isCenter ? 24 : 21,
+                                weight: isCenter ? .regular : .regular
                             ))
+                            .monospacedDigit()
                             .foregroundStyle(
-                                delta == 0
+                                isCenter
                                     ? Color.white
-                                    : Color.white.opacity(abs(delta) == 1 ? 0.42 : 0.18)
+                                    : Color.white.opacity(max(0.15, 0.65 - distance * 0.18))
                             )
-                            .scaleEffect(delta == 0 ? 1.0 : (abs(delta) == 1 ? 0.88 : 0.75))
-                            .frame(height: delta == 0 ? 44 : 24)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                guard delta != 0 else { return }
-                                emitTick(newValue: slotVal)
-                            }
+                        if isCenter {
+                            Text(unitLabel)
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text(unitLabel)
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(.clear)
+                        }
+                    }
+                    .rotation3DEffect(
+                        .degrees(Double(delta) * -18),
+                        axis: (x: 1, y: 0, z: 0),
+                        perspective: 0.4
+                    )
+                    .scaleEffect(isCenter ? 1.0 : max(0.82, 1.0 - distance * 0.06))
+                    .frame(height: 24)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard delta != 0 else { return }
+                        emitTick(newValue: slotVal)
                     }
                 }
-                .offset(y: visualOffset * 0.25)
             }
-            .frame(height: 168)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 2)
-                    .onChanged { gesture in
-                        if dragStartValue == nil {
-                            dragStartValue = value
-                        }
-                        let base = dragStartValue ?? value
-                        let steps = Int((-gesture.translation.height / stepHeight).rounded())
-                        let candidate = wrapped(base + steps)
-                        visualOffset = gesture.translation.height.truncatingRemainder(dividingBy: stepHeight)
-                        if candidate != value {
-                            emitTick(newValue: candidate)
-                        }
-                    }
-                    .onEnded { _ in
-                        dragStartValue = nil
-                        withAnimation(.spring(response: 0.2, dampingFraction: 0.75)) {
-                            visualOffset = 0
-                        }
-                    }
-            )
+            .offset(y: visualOffset * 0.25)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 2)
+                .onChanged { gesture in
+                    if dragStartValue == nil {
+                        dragStartValue = value
+                    }
+                    let base = dragStartValue ?? value
+                    let steps = Int((-gesture.translation.height / stepHeight).rounded())
+                    let candidate = wrapped(base + steps)
+                    visualOffset = gesture.translation.height.truncatingRemainder(dividingBy: stepHeight)
+                    if candidate != value {
+                        emitTick(newValue: candidate)
+                    }
+                }
+                .onEnded { _ in
+                    dragStartValue = nil
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.78)) {
+                        visualOffset = 0
+                    }
+                }
+        )
     }
 
     private func wrapped(_ raw: Int) -> Int {
@@ -432,8 +328,8 @@ private struct ThumbDrumColumn: View {
     }
 
     private func emitTick(newValue: Int) {
-        let gen = UIImpactFeedbackGenerator(style: .rigid)
-        gen.impactOccurred(intensity: 0.65)
+        let gen = UISelectionFeedbackGenerator()
+        gen.selectionChanged()
         onChange(newValue)
     }
 }

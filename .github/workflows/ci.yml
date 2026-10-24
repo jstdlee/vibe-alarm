@@ -3,7 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
@@ -47,9 +53,45 @@ jobs:
       - name: Build app + widget extension (Simulator)
         run: |
           set -o pipefail
-          xcodebuild build -project VibeAlarm.xcodeproj -scheme VibeAlarm \
+          xcodebuild build -project VibeAlarm.xcodeproj -scheme VibeAlarm -configuration Debug \
             -destination "id=$SIM_UDID" -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO | xcbeautify
+
+      - name: Capture real iOS Simulator screenshots
+        run: |
+          set -euo pipefail
+          mkdir -p dist/screenshots
+          xcrun simctl boot "$SIM_UDID" || true
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          xcrun simctl ui "$SIM_UDID" appearance dark || true
+          xcrun simctl status_bar "$SIM_UDID" override \
+            --time "9:41" \
+            --dataNetwork wifi \
+            --wifiMode active \
+            --wifiBars 3 \
+            --cellularMode active \
+            --cellularBars 4 \
+            --batteryState charged \
+            --batteryLevel 100 || true
+
+          APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
+          echo "Installing $APP_PATH on simulator $SIM_UDID"
+          xcrun simctl install "$SIM_UDID" "$APP_PATH"
+
+          capture_screen() {
+            local mode="$1"
+            local out="$2"
+            xcrun simctl terminate "$SIM_UDID" com.jstdlee.vibealarm || true
+            xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode"
+            sleep 3
+            xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
+          }
+
+          capture_screen "dashboard" "01-two-day-dashboard.png"
+          capture_screen "dial" "02-dual-thumb-dial.png"
+          capture_screen "widget" "03-home-widgets-and-bedtime.png"
+          capture_screen "byok" "04-byok-llm-and-calendar.png"
+          ls -lh dist/screenshots/
 
       - name: Build for device & package unsigned IPA
         run: |
@@ -63,7 +105,7 @@ jobs:
           (cd dist && shasum -a 256 "VibeAlarm.ipa" > "VibeAlarm.ipa.sha256")
           ls -lh dist/
 
-      - name: Upload unsigned IPA & test results
+      - name: Upload unsigned IPA, screenshots & test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -71,5 +113,6 @@ jobs:
           path: |
             dist/VibeAlarm.ipa
             dist/VibeAlarm.ipa.sha256
+            dist/screenshots/*.png
             build/*.xcresult
           if-no-files-found: error

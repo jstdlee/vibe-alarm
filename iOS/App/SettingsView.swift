@@ -1,11 +1,10 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// Settings view for:
-/// - BYOK LLM API Key (stored strictly in iOS Keychain), Provider, Endpoint & Model
-/// - Local EventKit Calendar selection & leave keywords (`请假 / 年假 / PTO / 休假`)
+/// Native Apple Settings-style sheet for:
 /// - Pre-bedtime notification time & interactive preview
-/// - 100% On-Device Privacy Architecture overview
+/// - Local EventKit Calendar selection & leave keywords (`请假 / 年假 / PTO / 休假`)
+/// - BYOK LLM API Key (stored strictly in iOS Keychain), Provider, Endpoint & Model
 public struct SettingsView: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
@@ -25,75 +24,53 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationStack {
             Form {
-                // Section 1: Privacy Guarantee
-                Section("隐私优先 · 100% 本地架构") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("零后端 API · 零集中式 Agent · 数据完全自主掌控", systemImage: "lock.shield.fill")
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(.mint)
-                        Text("• 闹钟排期、节假日判断与次日恢复全部在 iPhone 本地沙盒 (App Group) 完成。\n• 本地日历 (EventKit) 仅在设备端只读匹配请假关键词，绝不上传。\n• BYOK API Key 仅保存在 iOS 系统钥匙串 (Keychain)，由手机直连你选择的模型接口。")
-                            .font(.caption2)
+                // Section 1: Pre-Bedtime Notification
+                Section {
+                    DatePicker(
+                        "睡前提醒时间",
+                        selection: $bedtimeDate,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .onChange(of: bedtimeDate) { _, newDate in
+                        let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
+                        let mins = (comps.hour ?? 22) * 60 + (comps.minute ?? 30)
+                        viewModel.updateAlarmRule { $0.preBedtimeReminderMinutes = mins }
+                    }
+
+                    Button("发送睡前通知预览") {
+                        Task { await viewModel.sendInstantBedtimePreviewNotification() }
+                    }
+                    .foregroundStyle(.orange)
+                } header: {
+                    Text("睡前确认通知")
+                        .textCase(nil)
+                } footer: {
+                    Text("长按锁屏或通知中心的睡前提醒，可直接选择「跳过明日闹钟」或「推迟 30 分钟」。")
+                }
+
+                // Section 2: Local EventKit Calendar Integration
+                Section {
+                    HStack {
+                        Text("匹配关键词")
+                        Spacer()
+                        TextField("请假, 年假, PTO", text: $keywordsText)
+                            .multilineTextAlignment(.trailing)
                             .foregroundStyle(.secondary)
-                    }
-                }
-
-                // Section 2: BYOK LLM Configuration
-                Section("BYOK LLM 接口配置 (Keychain 加密存储)") {
-                    Picker("接口协议", selection: $provider) {
-                        ForEach(BYOKProviderKind.allCases, id: \.self) { item in
-                            Text(item.displayName).tag(item)
-                        }
-                    }
-                    .onChange(of: provider) { _, newValue in
-                        endpointURL = newValue.defaultEndpoint
-                        modelName = newValue.defaultModel
+                            .onChange(of: keywordsText) { _, newValue in
+                                let parts = newValue
+                                    .split(separator: ",")
+                                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                    .filter { !$0.isEmpty }
+                                var copy = viewModel.snapshot
+                                copy.leaveKeywords = parts
+                                viewModel.applySnapshot(copy)
+                            }
                     }
 
-                    TextField("API Endpoint URL", text: $endpointURL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-
-                    TextField("模型名称 (如 gpt-4o-mini / deepseek-chat)", text: $modelName)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-
-                    SecureField("API Key (仅存入本地 iOS Keychain)", text: $apiKeyInput)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-
-                    Button {
-                        saveBYOKSettings()
-                    } label: {
-                        Label("保存 BYOK 配置与 Keychain 密钥", systemImage: "key.fill")
-                            .foregroundStyle(.orange)
-                    }
-
-                    if let savedKeyStatus {
-                        Text(savedKeyStatus)
-                            .font(.caption2)
-                            .foregroundStyle(.green)
-                    }
-                }
-
-                // Section 3: Local EventKit Calendar Integration
-                Section("本地系统日历读取 (EventKit)") {
-                    TextField("请假识别关键词 (逗号分隔)", text: $keywordsText)
-                        .onChange(of: keywordsText) { _, newValue in
-                            let parts = newValue
-                                .split(separator: ",")
-                                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                                .filter { !$0.isEmpty }
-                            var copy = viewModel.snapshot
-                            copy.leaveKeywords = parts
-                            viewModel.applySnapshot(copy)
-                        }
-
-                    Button {
+                    Button("读取系统日历中的请假日程") {
                         Task { await viewModel.syncLocalCalendars() }
-                    } label: {
-                        Label("授权并扫描本地日历中的个人休假", systemImage: "calendar.badge.checkmark")
-                            .foregroundStyle(.mint)
                     }
+                    .foregroundStyle(.orange)
 
                     if !viewModel.localCalendarManager.availableCalendars.isEmpty {
                         ForEach(viewModel.localCalendarManager.availableCalendars) { cal in
@@ -109,49 +86,89 @@ public struct SettingsView: View {
                             } label: {
                                 HStack {
                                     Text("\(cal.title) (\(cal.sourceTitle))")
-                                        .font(.caption)
                                         .foregroundStyle(.white)
                                     Spacer()
-                                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(selected ? .mint : .secondary)
+                                    if selected {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.orange)
+                                    }
                                 }
                             }
                         }
                     }
+                } header: {
+                    Text("系统日历 (EventKit)")
+                        .textCase(nil)
+                } footer: {
+                    Text("仅在设备本地只读扫描全天或跨天请假事件，日程内容不会离开手机。")
                 }
 
-                // Section 4: Pre-Bedtime Notification
-                Section("睡前提醒通知 & 快捷操作测试") {
-                    DatePicker(
-                        "每晚提醒时间",
-                        selection: $bedtimeDate,
-                        displayedComponents: .hourAndMinute
-                    )
-                    .onChange(of: bedtimeDate) { _, newDate in
-                        let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
-                        let mins = (comps.hour ?? 22) * 60 + (comps.minute ?? 30)
-                        viewModel.updateAlarmRule { $0.preBedtimeReminderMinutes = mins }
+                // Section 3: BYOK LLM Configuration
+                Section {
+                    Picker("接口类型", selection: $provider) {
+                        ForEach(BYOKProviderKind.allCases, id: \.self) { item in
+                            Text(item.displayName).tag(item)
+                        }
+                    }
+                    .onChange(of: provider) { _, newValue in
+                        endpointURL = newValue.defaultEndpoint
+                        modelName = newValue.defaultModel
                     }
 
-                    Button {
-                        Task { await viewModel.sendInstantBedtimePreviewNotification() }
-                    } label: {
-                        Label("发送睡前可交互通知预览 (2秒后弹出)", systemImage: "bell.badge.waveform.fill")
-                            .foregroundStyle(.cyan)
+                    HStack {
+                        Text("接口地址")
+                        Spacer()
+                        TextField("URL", text: $endpointURL)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
                     }
+
+                    HStack {
+                        Text("模型")
+                        Spacer()
+                        TextField("gpt-4o-mini", text: $modelName)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+
+                    SecureField("API Key (存储在系统钥匙串)", text: $apiKeyInput)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    Button("存储接口配置") {
+                        saveBYOKSettings()
+                    }
+                    .foregroundStyle(.orange)
+
+                    if let savedKeyStatus {
+                        Text(savedKeyStatus)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("自带密钥模型解析 (BYOK)")
+                        .textCase(nil)
+                } footer: {
+                    Text("所有闹钟排期与日历数据均存储在本地 App Group 沙盒中，无云端服务器。API Key 加密保存在 iOS Keychain。")
                 }
             }
-            .navigationTitle("BYOK 与隐私设置")
+            .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { dismiss() }
+                        .foregroundStyle(.orange)
                 }
             }
             .onAppear {
                 loadInitialState()
             }
         }
+        .tint(.orange)
         .preferredColorScheme(.dark)
     }
 
@@ -182,6 +199,6 @@ public struct SettingsView: View {
         )
         viewModel.applySnapshot(copy)
         _ = KeychainHelper.saveAPIKey(apiKeyInput)
-        savedKeyStatus = "已保存配置并将 API Key 加密写入 iOS Keychain"
+        savedKeyStatus = "已存储至 iOS 钥匙串"
     }
 }

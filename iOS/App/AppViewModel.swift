@@ -16,15 +16,22 @@ public final class AppViewModel: ObservableObject {
     public let store: SharedAlarmStore
     public let localCalendarManager = LocalCalendarManager()
     private let engine = AlarmScheduleEngine()
+    private let referenceDateOverride: Date?
 
-    public init(store: SharedAlarmStore = SharedAlarmStore(appGroupID: AppConstants.appGroupID)) {
+    public init(
+        store: SharedAlarmStore = SharedAlarmStore(appGroupID: AppConstants.appGroupID),
+        referenceDateOverride: Date? = nil
+    ) {
         self.store = store
-        let loaded = store.load()
+        self.referenceDateOverride = referenceDateOverride
+        let refDate = referenceDateOverride ?? Date()
+        let loaded = store.load(referenceDate: refDate)
         self.snapshot = loaded
         let (today, tomorrow) = engine.resolveTwoDayDashboard(
             rule: loaded.alarmRule,
             entries: loaded.holidayEntries,
-            override: loaded.nextDayOverride
+            override: loaded.nextDayOverride,
+            referenceDate: refDate
         )
         self.todayAlarm = today
         self.tomorrowAlarm = tomorrow
@@ -32,25 +39,77 @@ public final class AppViewModel: ObservableObject {
             rule: loaded.alarmRule,
             entries: loaded.holidayEntries,
             override: loaded.nextDayOverride,
+            referenceDate: refDate,
             daysCount: 7
         )
     }
 
+    /// Creates a pre-seeded demo ViewModel for UI previews and Simulator screenshot capture.
+    public static func makeDemoPreview() -> AppViewModel {
+        let engine = AlarmScheduleEngine()
+        // Reference date: Sunday 2026-11-08 (so Tomorrow is Monday 2026-11-09 Deepavali Observed Holiday)
+        // With today (2026-11-08) marked as a statutory makeup workday ("调休补班") to showcase both cases cleanly.
+        let refDate = engine.date(from: "2026-11-08") ?? Date()
+        var entries = BuiltinHolidays.entries2026
+        entries.removeAll { $0.date == "2026-11-08" }
+        entries.append(
+            HolidayCalendarEntry(
+                date: "2026-11-08",
+                title: "调休补班",
+                kind: .makeupWorkday,
+                source: .externalICS
+            )
+        )
+        entries.append(
+            HolidayCalendarEntry(
+                date: "2026-11-11",
+                title: "个人年假",
+                kind: .personalLeave,
+                source: .localEventKit
+            )
+        )
+        entries.sort { $0.date < $1.date }
+
+        let demoSnapshot = VibeAlarmSnapshot(
+            alarmRule: AlarmRule(
+                label: "起床",
+                hour: 7,
+                minute: 30,
+                isEnabled: true,
+                repeatMode: .weekdays,
+                skipPublicHolidays: true,
+                skipPersonalLeave: true,
+                autoRestoreNextDay: true,
+                preBedtimeReminderMinutes: 22 * 60 + 30,
+                bedtimeReminderEnabled: true
+            ),
+            nextDayOverride: nil,
+            holidayEntries: entries,
+            subscriptions: ExternalCalendarSubscription.defaultPresets
+        )
+        let vm = AppViewModel(referenceDateOverride: refDate)
+        vm.applySnapshot(demoSnapshot, persist: false)
+        return vm
+    }
+
     public func reloadFromStore() {
-        let loaded = store.load()
+        let refDate = referenceDateOverride ?? Date()
+        let loaded = store.load(referenceDate: refDate)
         applySnapshot(loaded, persist: false)
     }
 
     public func applySnapshot(_ newSnapshot: VibeAlarmSnapshot, persist: Bool = true) {
+        let refDate = referenceDateOverride ?? Date()
         var current = newSnapshot
         if persist {
-            current = (try? store.save(newSnapshot)) ?? newSnapshot
+            current = (try? store.save(newSnapshot, referenceDate: refDate)) ?? newSnapshot
         }
         snapshot = current
         let (today, tomorrow) = engine.resolveTwoDayDashboard(
             rule: current.alarmRule,
             entries: current.holidayEntries,
-            override: current.nextDayOverride
+            override: current.nextDayOverride,
+            referenceDate: refDate
         )
         todayAlarm = today
         tomorrowAlarm = tomorrow
@@ -58,6 +117,7 @@ public final class AppViewModel: ObservableObject {
             rule: current.alarmRule,
             entries: current.holidayEntries,
             override: current.nextDayOverride,
+            referenceDate: refDate,
             daysCount: 7
         )
 
@@ -82,21 +142,12 @@ public final class AppViewModel: ObservableObject {
         applySnapshot(copy)
     }
 
-    // MARK: - Next-Day One-Tap Quick Actions (跳过明日 / 推迟 / 一键恢复 / 强制保持)
+    // MARK: - Next-Day One-Tap Quick Actions
 
     public func performTomorrowOverride(_ action: NextDayOverrideAction) {
-        guard let updated = try? store.setTomorrowOverride(action: action) else { return }
+        let refDate = referenceDateOverride ?? Date()
+        guard let updated = try? store.setTomorrowOverride(action: action, referenceDate: refDate) else { return }
         applySnapshot(updated, persist: false)
-        switch action {
-        case .skipTomorrow:
-            showBanner("已跳过明日闹钟，后天自动恢复原定排期")
-        case .delayTomorrow(let minutes):
-            showBanner("明日闹钟已推迟 \(minutes) 分钟，后天自动恢复")
-        case .forceKeepTomorrow:
-            showBanner("已锁定明日正常响铃（忽略节假日跳过）")
-        case .none:
-            showBanner("已恢复明日智能排期")
-        }
     }
 
     public func incrementTomorrowDelay(by deltaMinutes: Int) {
@@ -116,7 +167,7 @@ public final class AppViewModel: ObservableObject {
         if !localCalendarManager.hasReadAccess {
             let granted = await localCalendarManager.requestAccess()
             if !granted {
-                showBanner("未获得系统日历读取权限，可在系统设置中开启")
+                showBanner("未获得系统日历读取权限")
                 return
             }
         }
@@ -126,7 +177,7 @@ public final class AppViewModel: ObservableObject {
         )
         if let updated = try? store.upsertHolidayEntries(leaveEntries, replacingSource: .localEventKit) {
             applySnapshot(updated, persist: false)
-            showBanner("已从本地日历同步 \(leaveEntries.count) 条个人休假/调休记录")
+            showBanner("已同步 \(leaveEntries.count) 条日历休假记录")
         }
     }
 
@@ -166,11 +217,9 @@ public final class AppViewModel: ObservableObject {
             copy.holidayEntries.sort { $0.date < $1.date }
         }
         applySnapshot(copy)
-        showBanner(
-            successCount > 0
-                ? "已同步 \(successCount) 个外部日历订阅 (\(collected.count) 条节假日/调休)"
-                : "外部订阅同步完成（离线状态下继续使用内置与已缓存节假日）"
-        )
+        if successCount > 0 {
+            showBanner("已更新 \(successCount) 个订阅日历")
+        }
     }
 
     // MARK: - Holiday Entries & Subscriptions Management
@@ -187,7 +236,7 @@ public final class AppViewModel: ObservableObject {
             if !copy.subscriptions.contains(where: { $0.url.caseInsensitiveCompare(url) == .orderedSame }) {
                 copy.subscriptions.append(
                     ExternalCalendarSubscription(
-                        name: "从通知提取的日历订阅",
+                        name: "日历订阅",
                         url: url,
                         regionHint: .custom,
                         isEnabled: true
@@ -196,7 +245,6 @@ public final class AppViewModel: ObservableObject {
             }
         }
         applySnapshot(copy)
-        showBanner("已写入 \(entries.count) 条假期/调休记录")
     }
 
     public func deleteHolidayEntry(_ entry: HolidayCalendarEntry) {
@@ -239,13 +287,13 @@ public final class AppViewModel: ObservableObject {
         await requestNotificationPermissionIfNeeded()
         let content = UNMutableNotificationContent()
         if let eff = tomorrowAlarm.effectiveTime, tomorrowAlarm.status.isRinging {
-            content.title = "🌙 睡前提醒预览：明天 \(eff) 响铃"
+            content.title = "明日闹钟确认 · \(eff)"
             content.subtitle = "明天 (\(tomorrowAlarm.weekdayText)) · \(tomorrowAlarm.reasonBadge)"
-            content.body = "长按此通知即可直接选择「跳过明日闹钟」或「推迟 30m / 1h」，后天自动恢复！"
+            content.body = "长按此通知可选择「跳过明日闹钟」或「推迟 30 分钟」，后天自动恢复。"
         } else {
-            content.title = "🌙 睡前提醒预览：明天免响铃 (\(tomorrowAlarm.reasonBadge))"
+            content.title = "明日免响铃 · \(tomorrowAlarm.reasonBadge)"
             content.subtitle = "明天 (\(tomorrowAlarm.weekdayText)) 原定 \(tomorrowAlarm.baseTime)"
-            content.body = "长按此通知可测试「强制保持明日响铃」或「恢复原定时间」。"
+            content.body = "长按此通知可选择「恢复响铃」或「推迟 30 分钟」。"
         }
         content.sound = .default
         content.categoryIdentifier = AppConstants.bedtimeCategoryIdentifier
@@ -258,12 +306,9 @@ public final class AppViewModel: ObservableObject {
             trigger: trigger
         )
         try? await UNUserNotificationCenter.current().add(req)
-        showBanner("将在 2 秒后弹出可交互睡前提醒通知（可长按操作）")
     }
 
     public func showBanner(_ message: String) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            statusBannerMessage = message
-        }
+        statusBannerMessage = message
     }
 }
