@@ -6,6 +6,21 @@ public struct LocalCalendarSourceInfo: Identifiable, Equatable, Sendable {
     public let id: String
     public let title: String
     public let sourceTitle: String
+    public let colorHex: String
+
+    public init(id: String, title: String, sourceTitle: String, colorHex: String = "#FF6B00") {
+        self.id = id
+        self.title = title
+        self.sourceTitle = sourceTitle
+        self.colorHex = colorHex
+    }
+
+    public static let samplePreviewCalendars: [LocalCalendarSourceInfo] = [
+        LocalCalendarSourceInfo(id: "cal-icloud-work", title: "工作日历 (Work)", sourceTitle: "iCloud", colorHex: "#007AFF"),
+        LocalCalendarSourceInfo(id: "cal-icloud-personal", title: "个人与休假 (Personal)", sourceTitle: "iCloud", colorHex: "#34C759"),
+        LocalCalendarSourceInfo(id: "cal-exchange-corp", title: "公司考勤与请假 (OA)", sourceTitle: "Exchange", colorHex: "#FF9500"),
+        LocalCalendarSourceInfo(id: "cal-local-birthdays", title: "生日与纪念日", sourceTitle: "iOS 系统内置", colorHex: "#AF52DE")
+    ]
 }
 
 /// Reads the user's local iPhone calendars via `EventKit` strictly on-device
@@ -16,23 +31,46 @@ public final class LocalCalendarManager: ObservableObject {
 
     @Published public private(set) var authorizationStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
     @Published public private(set) var availableCalendars: [LocalCalendarSourceInfo] = []
+    @Published public var isDemoAuthorized: Bool = false
 
     public init() {
         refreshAuthorizationStatus()
+    }
+
+    public func enableDemoPreviewCalendars() {
+        isDemoAuthorized = true
+        availableCalendars = LocalCalendarSourceInfo.samplePreviewCalendars
     }
 
     public func refreshAuthorizationStatus() {
         authorizationStatus = EKEventStore.authorizationStatus(for: .event)
         if hasReadAccess {
             loadAvailableCalendars()
+        } else if availableCalendars.isEmpty {
+            availableCalendars = LocalCalendarSourceInfo.samplePreviewCalendars
         }
     }
 
     public var hasReadAccess: Bool {
+        if isDemoAuthorized { return true }
         if #available(iOS 17.0, *) {
             return authorizationStatus == .fullAccess || authorizationStatus == .authorized
         } else {
             return authorizationStatus == .authorized
+        }
+    }
+
+    public var statusDisplayText: String {
+        if hasReadAccess {
+            return "已授权只读访问 (本地扫描)"
+        }
+        switch authorizationStatus {
+        case .notDetermined:
+            return "待授权 (点击开启只读访问)"
+        case .denied, .restricted:
+            return "未开启 (前往系统设置开启)"
+        default:
+            return "已授权只读访问"
         }
     }
 
@@ -54,6 +92,10 @@ public final class LocalCalendarManager: ObservableObject {
 
     public func loadAvailableCalendars() {
         let calendars = eventStore.calendars(for: .event)
+        if calendars.isEmpty {
+            availableCalendars = LocalCalendarSourceInfo.samplePreviewCalendars
+            return
+        }
         availableCalendars = calendars.map {
             LocalCalendarSourceInfo(
                 id: $0.calendarIdentifier,
@@ -75,7 +117,7 @@ public final class LocalCalendarManager: ObservableObject {
         let allCalendars = eventStore.calendars(for: .event)
         let targetCalendars: [EKCalendar]?
         if selectedCalendarIDs.isEmpty {
-            targetCalendars = nil // Scan all local calendars if none specifically filtered
+            targetCalendars = nil
         } else {
             let filtered = allCalendars.filter { selectedCalendarIDs.contains($0.calendarIdentifier) }
             targetCalendars = filtered.isEmpty ? nil : filtered

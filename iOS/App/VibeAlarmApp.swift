@@ -24,6 +24,7 @@ struct VibeAlarmApp: App {
     var body: some Scene {
         WindowGroup {
             rootView
+                .preferredColorScheme(.light)
                 .task {
                     notificationDelegate.viewModel = viewModel
                     if previewScreen == nil {
@@ -42,20 +43,71 @@ struct VibeAlarmApp: App {
     private var rootView: some View {
         switch previewScreen {
         case "dial":
-            DualThumbTimeDialSheet(viewModel: viewModel)
+            MainTabView(viewModel: viewModel, initialTab: .dial)
+        case "calendar":
+            MainTabView(viewModel: viewModel, initialTab: .calendar)
+        case "settings":
+            MainTabView(viewModel: viewModel, initialTab: .settings)
         case "widget":
             WidgetAndBedtimeShowcaseView(viewModel: viewModel)
-        case "calendar":
-            HolidayCalendarView(viewModel: viewModel)
         case "byok":
             BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
         default:
-            TwoDayDashboardView(viewModel: viewModel)
+            MainTabView(viewModel: viewModel, initialTab: .dashboard)
         }
     }
 }
 
-// MARK: - Native Showcase View for Interactive Widget & Bedtime Notification Preview
+// MARK: - Main 4-Tab Bar Navigation (Light Theme)
+
+enum MainAppTab: Hashable {
+    case dashboard
+    case dial
+    case calendar
+    case settings
+}
+
+struct MainTabView: View {
+    @ObservedObject var viewModel: AppViewModel
+    @State private var selectedTab: MainAppTab
+
+    init(viewModel: AppViewModel, initialTab: MainAppTab = .dashboard) {
+        self.viewModel = viewModel
+        _selectedTab = State(initialValue: initialTab)
+    }
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            TwoDayDashboardView(viewModel: viewModel)
+                .tabItem {
+                    Label("闹钟", systemImage: "alarm.fill")
+                }
+                .tag(MainAppTab.dashboard)
+
+            DualThumbTimeDialSheet(viewModel: viewModel, isEmbeddedInTab: true)
+                .tabItem {
+                    Label("设定时间", systemImage: "dial.medium.fill")
+                }
+                .tag(MainAppTab.dial)
+
+            HolidayCalendarView(viewModel: viewModel, isEmbeddedInTab: true)
+                .tabItem {
+                    Label("内置日历与事项", systemImage: "calendar.badge.plus")
+                }
+                .tag(MainAppTab.calendar)
+
+            SettingsView(viewModel: viewModel, isEmbeddedInTab: true)
+                .tabItem {
+                    Label("日历源与权限", systemImage: "calendar.badge.checkmark")
+                }
+                .tag(MainAppTab.settings)
+        }
+        .tint(.orange)
+        .preferredColorScheme(.light)
+    }
+}
+
+// MARK: - Native Showcase View for Interactive Widget & Bedtime Notification Preview (Light Theme)
 
 struct WidgetAndBedtimeShowcaseView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -68,7 +120,6 @@ struct WidgetAndBedtimeShowcaseView: View {
                         HStack(alignment: .top) {
                             widgetDayColumn(day: viewModel.todayAlarm, isTomorrow: false)
                             Divider()
-                                .overlay(Color.white.opacity(0.14))
                                 .padding(.horizontal, 6)
                             widgetDayColumn(day: viewModel.tomorrowAlarm, isTomorrow: true)
                         }
@@ -104,7 +155,7 @@ struct WidgetAndBedtimeShowcaseView: View {
 
                         Text("明日免响铃 · \(viewModel.tomorrowAlarm.reasonBadge)")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
 
                         Text("明天 (\(viewModel.tomorrowAlarm.weekdayText)) 原定 \(viewModel.tomorrowAlarm.baseTime)。长按通知可临时更改明日排期。")
                             .font(.footnote)
@@ -120,15 +171,34 @@ struct WidgetAndBedtimeShowcaseView: View {
                     Text("睡前确认通知 (22:30 长按快捷操作)")
                         .textCase(nil)
                 }
+
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Label("AI 解析放假通知与请假邮件", systemImage: "sparkles")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.orange)
+                            Spacer()
+                            Text("本地规则 + BYOK")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("自动识别文本中的「11月11日-12日休年假，11月21日周六调休补班」，一键写入内置日历。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                } header: {
+                    Text("BYOK 智能解析能力")
+                        .textCase(nil)
+                }
             }
             .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color.black)
             .navigationTitle("小组件与睡前通知")
             .navigationBarTitleDisplayMode(.inline)
         }
         .tint(.orange)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
     }
 
     private func widgetDayColumn(day: ResolvedDayAlarm, isTomorrow: Bool) -> some View {
@@ -142,9 +212,9 @@ struct WidgetAndBedtimeShowcaseView: View {
             .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
 
             Text(day.effectiveTime ?? day.baseTime)
-                .font(.system(size: 34, weight: .light))
+                .font(.system(size: 34, weight: .light, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(day.status.isRinging ? Color.white : Color(uiColor: .tertiaryLabel))
+                .foregroundStyle(day.status.isRinging ? Color.primary : Color(uiColor: .tertiaryLabel))
 
             Text(day.status.isRinging ? day.reasonBadge : "不响铃 · \(day.reasonBadge)")
                 .font(.caption2)
@@ -156,11 +226,11 @@ struct WidgetAndBedtimeShowcaseView: View {
 
     private func widgetPillButton(title: String) -> some View {
         Text(title)
-            .font(.caption.weight(.medium))
+            .font(.caption.weight(.semibold))
             .foregroundStyle(.orange)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 7)
-            .background(Color(uiColor: .tertiarySystemFill))
+            .background(Color.orange.opacity(0.12))
             .clipShape(Capsule())
     }
 
@@ -168,10 +238,10 @@ struct WidgetAndBedtimeShowcaseView: View {
         HStack {
             Text(title)
                 .font(.body)
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
             Spacer()
             Image(systemName: systemImage)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.orange)
         }
     }
 }

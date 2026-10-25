@@ -50,7 +50,7 @@ struct VibeAlarmTimelineProvider: TimelineProvider {
     }
 }
 
-// MARK: - Widget View (Small & Medium — Apple Native Clock Aesthetic)
+// MARK: - Widget View (Small & Medium — Apple Native Light Clock Aesthetic)
 
 struct VibeAlarmWidgetEntryView: View {
     var entry: VibeAlarmWidgetEntry
@@ -66,7 +66,7 @@ struct VibeAlarmWidgetEntryView: View {
             }
         }
         .containerBackground(for: .widget) {
-            Color(red: 0.11, green: 0.11, blue: 0.118) // #1C1C1E
+            Color.white
         }
     }
 
@@ -83,9 +83,9 @@ struct VibeAlarmWidgetEntryView: View {
             Spacer(minLength: 0)
 
             Text(entry.tomorrow.effectiveTime ?? entry.tomorrow.baseTime)
-                .font(.system(size: 34, weight: .light))
+                .font(.system(size: 34, weight: .light, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(entry.tomorrow.status.isRinging ? Color.white : Color.secondary)
+                .foregroundStyle(entry.tomorrow.status.isRinging ? Color.primary : Color.secondary)
 
             Text(entry.tomorrow.status.isRinging ? entry.tomorrow.reasonBadge : "不响铃 · \(entry.tomorrow.reasonBadge)")
                 .font(.caption2)
@@ -129,7 +129,6 @@ struct VibeAlarmWidgetEntryView: View {
             HStack(alignment: .top) {
                 dayBlock(day: entry.today, isTomorrow: false)
                 Divider()
-                    .overlay(Color.white.opacity(0.12))
                     .padding(.horizontal, 4)
                 dayBlock(day: entry.tomorrow, isTomorrow: true)
             }
@@ -173,9 +172,9 @@ struct VibeAlarmWidgetEntryView: View {
             .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
 
             Text(day.effectiveTime ?? day.baseTime)
-                .font(.system(size: 32, weight: .light))
+                .font(.system(size: 32, weight: .light, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(day.status.isRinging ? Color.white : Color.secondary)
+                .foregroundStyle(day.status.isRinging ? Color.primary : Color.secondary)
 
             Text(day.status.isRinging ? day.reasonBadge : "不响铃 · \(day.reasonBadge)")
                 .font(.caption2)

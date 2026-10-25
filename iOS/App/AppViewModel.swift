@@ -16,7 +16,7 @@ public final class AppViewModel: ObservableObject {
     public let store: SharedAlarmStore
     public let localCalendarManager = LocalCalendarManager()
     private let engine = AlarmScheduleEngine()
-    private let referenceDateOverride: Date?
+    public let referenceDateOverride: Date?
 
     public init(
         store: SharedAlarmStore = SharedAlarmStore(appGroupID: AppConstants.appGroupID),
@@ -48,31 +48,52 @@ public final class AppViewModel: ObservableObject {
     public static func makeDemoPreview() -> AppViewModel {
         let engine = AlarmScheduleEngine()
         // Reference date: Sunday 2026-11-08 (so Tomorrow is Monday 2026-11-09 Deepavali Observed Holiday)
-        // With today (2026-11-08) marked as a statutory makeup workday ("调休补班") to showcase both cases cleanly.
         let refDate = engine.date(from: "2026-11-08") ?? Date()
         var entries = BuiltinHolidays.entries2026
         entries.removeAll { $0.date == "2026-11-08" }
-        entries.append(
+        entries.append(contentsOf: [
             HolidayCalendarEntry(
                 date: "2026-11-08",
-                title: "调休补班",
+                title: "周末调休补班",
                 kind: .makeupWorkday,
                 source: .externalICS
-            )
-        )
-        entries.append(
+            ),
             HolidayCalendarEntry(
                 date: "2026-11-11",
-                title: "个人年假",
+                title: "个人年假 · 家庭出行",
                 kind: .personalLeave,
                 source: .localEventKit
+            ),
+            HolidayCalendarEntry(
+                date: "2026-11-12",
+                title: "个人年假 · 家庭出行",
+                kind: .personalLeave,
+                source: .localEventKit
+            ),
+            HolidayCalendarEntry(
+                date: "2026-11-21",
+                title: "季度发布周六值班",
+                kind: .makeupWorkday,
+                source: .builtin
+            ),
+            HolidayCalendarEntry(
+                date: "2026-11-27",
+                title: "公司福利公休假",
+                kind: .publicHoliday,
+                source: .byokLLM
             )
-        )
+        ])
         entries.sort { $0.date < $1.date }
+
+        let now = refDate
+        var subs = ExternalCalendarSubscription.defaultPresets
+        for i in subs.indices {
+            subs[i].lastSyncedAt = now
+        }
 
         let demoSnapshot = VibeAlarmSnapshot(
             alarmRule: AlarmRule(
-                label: "起床",
+                label: "起床闹钟",
                 hour: 7,
                 minute: 30,
                 isEnabled: true,
@@ -85,9 +106,15 @@ public final class AppViewModel: ObservableObject {
             ),
             nextDayOverride: nil,
             holidayEntries: entries,
-            subscriptions: ExternalCalendarSubscription.defaultPresets
+            subscriptions: subs,
+            selectedLocalCalendarIDs: [
+                "cal-icloud-work",
+                "cal-icloud-personal",
+                "cal-exchange-corp"
+            ]
         )
         let vm = AppViewModel(referenceDateOverride: refDate)
+        vm.localCalendarManager.enableDemoPreviewCalendars()
         vm.applySnapshot(demoSnapshot, persist: false)
         return vm
     }
@@ -175,9 +202,13 @@ public final class AppViewModel: ObservableObject {
             selectedCalendarIDs: snapshot.selectedLocalCalendarIDs,
             keywords: snapshot.leaveKeywords
         )
-        if let updated = try? store.upsertHolidayEntries(leaveEntries, replacingSource: .localEventKit) {
+        if !leaveEntries.isEmpty,
+           let updated = try? store.upsertHolidayEntries(leaveEntries, replacingSource: .localEventKit) {
             applySnapshot(updated, persist: false)
-            showBanner("已同步 \(leaveEntries.count) 条日历休假记录")
+            showBanner("已同步 \(leaveEntries.count) 条 iOS 系统日历请假日程")
+        } else {
+            let existingCount = snapshot.holidayEntries.filter { $0.source == .localEventKit }.count
+            showBanner("已扫描 iOS 系统日历 (当前匹配 \(existingCount) 条休假)")
         }
     }
 
@@ -218,11 +249,11 @@ public final class AppViewModel: ObservableObject {
         }
         applySnapshot(copy)
         if successCount > 0 {
-            showBanner("已更新 \(successCount) 个订阅日历")
+            showBanner("已更新 \(successCount) 个外部订阅日历")
         }
     }
 
-    // MARK: - Holiday Entries & Subscriptions Management
+    // MARK: - Holiday Entries & Subscriptions Management (CRUD)
 
     public func mergeExtractedEntries(_ entries: [HolidayCalendarEntry], discoveredURLs: [String]) {
         var copy = snapshot
@@ -258,14 +289,41 @@ public final class AppViewModel: ObservableObject {
         mergeExtractedEntries([entry], discoveredURLs: [])
     }
 
+    public func updateHolidayEntry(
+        oldEntry: HolidayCalendarEntry,
+        newDate: String,
+        newTitle: String,
+        newKind: HolidayEntryKind
+    ) {
+        var copy = snapshot
+        copy.holidayEntries.removeAll { $0.id == oldEntry.id }
+        let updated = HolidayCalendarEntry(
+            date: newDate,
+            title: newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? newKind.displayTitle : newTitle,
+            kind: newKind,
+            source: oldEntry.source
+        )
+        copy.holidayEntries.append(updated)
+        copy.holidayEntries.sort { $0.date < $1.date }
+        applySnapshot(copy)
+    }
+
     public func addSubscription(name: String, url: String, region: HolidayRegionHint) {
         var copy = snapshot
         let cleanURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "webcal://", with: "https://")
         copy.subscriptions.append(
-            ExternalCalendarSubscription(name: name, url: cleanURL, regionHint: region, isEnabled: true)
+            ExternalCalendarSubscription(name: name, url: cleanURL, regionHint: region, lastSyncedAt: Date(), isEnabled: true)
         )
         applySnapshot(copy)
+    }
+
+    public func toggleSubscription(id: UUID, isEnabled: Bool) {
+        var copy = snapshot
+        if let idx = copy.subscriptions.firstIndex(where: { $0.id == id }) {
+            copy.subscriptions[idx].isEnabled = isEnabled
+            applySnapshot(copy)
+        }
     }
 
     public func removeSubscription(id: UUID) {

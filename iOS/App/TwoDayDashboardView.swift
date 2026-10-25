@@ -1,8 +1,8 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// Primary iOS Clock-style ("闹钟") screen:
-/// - Pure Apple HIG dark aesthetic (`#000000` background, `#1C1C1E` inset grouped cells, `#FF9F0A` orange tint, light SF numerals).
+/// Primary iOS Clock-style ("闹钟") screen in Apple Light Theme:
+/// - Clean `#F2F2F7` grouped background, `#FFFFFF` inset grouped cells, `#FF6B00` orange tint, light SF numerals.
 /// - Focused on **Today & Tomorrow (近两日)**: clearly shows statutory holiday skips, makeup workday activation, and one-tap temporary overrides that automatically restore the day after tomorrow.
 public struct TwoDayDashboardView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -26,37 +26,38 @@ public struct TwoDayDashboardView: View {
                 } header: {
                     HStack(spacing: 6) {
                         Image(systemName: "bed.double.fill")
+                            .foregroundStyle(.orange)
                         Text("睡眠｜起床闹钟 · 近两日")
                     }
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .textCase(nil)
                 } footer: {
                     Text("次日操作（「跳过明日」或「推迟 30 分钟」）仅对明天单次生效，后天自动恢复原定排期。")
                         .font(.footnote)
                 }
 
-                // Section 2: Next 5 Days Schedule (近期排期)
+                // Section 2: Next 5 Days Schedule (后续 5 日排期)
                 Section {
                     ForEach(Array(viewModel.upcomingWeek.dropFirst(2))) { item in
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(item.weekdayText) · \(item.date.suffix(5))")
-                                    .font(.body)
-                                    .foregroundStyle(.white)
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(.primary)
                                 Text(item.reasonBadge)
                                     .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(item.status.isRinging ? Color.secondary : Color.orange)
                             }
                             Spacer()
                             if let eff = item.effectiveTime, item.status.isRinging {
                                 Text(eff)
-                                    .font(.system(size: 22, weight: .light))
+                                    .font(.system(size: 22, weight: .light, design: .rounded))
                                     .monospacedDigit()
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(.primary)
                             } else {
                                 Text("不响铃")
-                                    .font(.subheadline)
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -67,18 +68,34 @@ public struct TwoDayDashboardView: View {
                         .textCase(nil)
                 }
 
-                // Section 3: Holiday & Calendar Sources (节假日与日历)
+                // Section 3: Quick Entry to Built-in Calendar, External ICS & iOS EventKit Settings
                 Section {
                     Button {
                         showHolidayCalendar = true
                     } label: {
                         HStack {
-                            Label("公共假期与调休订阅", systemImage: "calendar")
-                                .foregroundStyle(.white)
+                            Label("管理内置日历与事项", systemImage: "calendar.badge.plus")
+                                .foregroundStyle(.primary)
                             Spacer()
-                            Text("\(viewModel.snapshot.subscriptions.count) 个订阅源")
+                            Text("\(viewModel.snapshot.holidayEntries.count) 项记录")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+
+                    Button {
+                        showSettings = true
+                    } label: {
+                        HStack {
+                            Label("外部日历订阅 (.ics) 与 iOS 日历权限", systemImage: "calendar.badge.checkmark")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Text("已启用 \(viewModel.snapshot.subscriptions.count) 源")
+                                .font(.subheadline)
+                                .foregroundStyle(.orange)
                             Image(systemName: "chevron.right")
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.tertiary)
@@ -89,10 +106,10 @@ public struct TwoDayDashboardView: View {
                         showBYOKSheet = true
                     } label: {
                         HStack {
-                            Label("解析放假通知或请假文本", systemImage: "doc.text.magnifyingglass")
-                                .foregroundStyle(.white)
+                            Label("解析放假通知或请假邮件 (BYOK AI)", systemImage: "doc.text.magnifyingglass")
+                                .foregroundStyle(.primary)
                             Spacer()
-                            Text("本地 / BYOK")
+                            Text("本地 / AI")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             Image(systemName: "chevron.right")
@@ -100,35 +117,17 @@ public struct TwoDayDashboardView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
-
-                    Button {
-                        Task { await viewModel.syncLocalCalendars() }
-                    } label: {
-                        HStack {
-                            Label("同步系统日历请假日程", systemImage: "arrow.triangle.2.circlepath")
-                                .foregroundStyle(.orange)
-                            Spacer()
-                            if let message = viewModel.statusBannerMessage {
-                                Text(message)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
                 } header: {
-                    Text("节假日与请假数据源")
+                    Text("内置日历、外部订阅与系统日历")
                         .textCase(nil)
                 }
             }
             .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(Color.black)
             .navigationTitle("闹钟")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("设置") {
+                    Button("日历源设置") {
                         showSettings = true
                     }
                     .foregroundStyle(.orange)
@@ -137,8 +136,11 @@ public struct TwoDayDashboardView: View {
                     Button {
                         showEditAlarmSheet = true
                     } label: {
-                        Text("设定时间")
-                            .fontWeight(.regular)
+                        HStack(spacing: 4) {
+                            Image(systemName: "dial.medium.fill")
+                            Text("设定时间")
+                        }
+                        .fontWeight(.semibold)
                     }
                     .foregroundStyle(.orange)
                 }
@@ -150,17 +152,17 @@ public struct TwoDayDashboardView: View {
                 HolidayCalendarView(viewModel: viewModel)
             }
             .sheet(isPresented: $showBYOKSheet) {
-                BYOKInputSheet(viewModel: viewModel)
+                BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView(viewModel: viewModel)
             }
         }
         .tint(.orange)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
     }
 
-    // MARK: - Native iOS Clock-Style Alarm Row
+    // MARK: - Native iOS Clock-Style Alarm Row (Light Mode)
 
     @ViewBuilder
     private func clockAlarmRow(day: ResolvedDayAlarm, isTomorrow: Bool) -> some View {
@@ -170,7 +172,7 @@ public struct TwoDayDashboardView: View {
                     // Subtle top metadata line
                     HStack(spacing: 6) {
                         Text("\(day.displayLabel) · \(day.weekdayText)")
-                            .font(.subheadline.weight(.medium))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
                         Text("(\(day.date.suffix(5)))")
                             .font(.subheadline.monospacedDigit())
@@ -180,9 +182,9 @@ public struct TwoDayDashboardView: View {
                     // Large thin Apple Clock numeral
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(day.effectiveTime ?? day.baseTime)
-                            .font(.system(size: 56, weight: .light))
+                            .font(.system(size: 54, weight: .light, design: .rounded))
                             .monospacedDigit()
-                            .foregroundStyle(day.status.isRinging ? Color.white : Color(uiColor: .tertiaryLabel))
+                            .foregroundStyle(day.status.isRinging ? Color.primary : Color(uiColor: .tertiaryLabel))
 
                         if let eff = day.effectiveTime, eff != day.baseTime, day.status.isRinging {
                             Text("原定 \(day.baseTime)")
@@ -220,12 +222,12 @@ public struct TwoDayDashboardView: View {
                     Button {
                         showEditAlarmSheet = true
                     } label: {
-                        Text("更改")
+                        Text("拨盘设定")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 7)
-                            .background(Color(uiColor: .tertiarySystemFill))
+                            .background(Color.orange.opacity(0.14))
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
@@ -304,16 +306,16 @@ public struct TwoDayDashboardView: View {
                 Image(systemName: systemImage)
                     .font(.caption)
                 Text(title)
-                    .font(.caption.weight(.medium))
+                    .font(.caption.weight(.semibold))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 7)
             .background(
                 isActive
-                    ? Color.orange.opacity(0.22)
-                    : Color(uiColor: .tertiarySystemFill)
+                    ? Color.orange
+                    : Color.orange.opacity(0.12)
             )
-            .foregroundStyle(.orange)
+            .foregroundStyle(isActive ? Color.white : Color.orange)
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)

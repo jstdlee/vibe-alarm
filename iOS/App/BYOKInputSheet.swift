@@ -2,12 +2,12 @@ import SwiftUI
 import VibeAlarmCore
 
 /// Native Apple HIG sheet for parsing holiday notices, HR leave emails, or `.ics` URLs
-/// via on-device deterministic rules or Keychain-backed BYOK LLM.
+/// via on-device deterministic rules or Keychain-backed BYOK LLM (Light Theme).
 public struct BYOKInputSheet: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var inputText: String = "HR通知：我将在 2026年10月26日到10月28日休年假，10月31日周六调休补班。"
+    @State private var inputText: String = "HR通知：我将在 2026年11月11日到11月12日休年假，11月21日周六调休补班。"
     @State private var isExtracting: Bool = false
     @State private var errorMessage: String?
     @State private var extractionResult: BYOKExtractionResult?
@@ -17,7 +17,7 @@ public struct BYOKInputSheet: View {
     public init(viewModel: AppViewModel, preloadPreview: Bool = false) {
         self.viewModel = viewModel
         if preloadPreview {
-            let sample = "HR通知：我将在 2026年10月26日到10月28日休年假，10月31日周六调休补班。"
+            let sample = "HR通知：我将在 2026年11月11日到11月12日休年假，11月21日周六调休补班。"
             _extractionResult = State(initialValue: BYOKHolidayService().parseLocally(text: sample))
         }
     }
@@ -90,8 +90,8 @@ public struct BYOKInputSheet: View {
                                 }
                                 Spacer()
                                 Text(entry.kind.displayTitle)
-                                    .font(.footnote)
-                                    .foregroundStyle(entry.kind == .makeupWorkday ? Color.orange : Color.secondary)
+                                    .font(.footnote.weight(.medium))
+                                    .foregroundStyle(entry.kind == .makeupWorkday ? Color.blue : Color.orange)
                             }
                         }
 
@@ -111,7 +111,7 @@ public struct BYOKInputSheet: View {
                         } label: {
                             HStack {
                                 Spacer()
-                                Text("写入假期日历 (\(result.entries.count) 项)")
+                                Text("写入内置日历 (\(result.entries.count) 项)")
                                     .fontWeight(.semibold)
                                     .foregroundStyle(.orange)
                                 Spacer()
@@ -135,7 +135,7 @@ public struct BYOKInputSheet: View {
             }
         }
         .tint(.orange)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
     }
 
     private func runOfflineParse() {

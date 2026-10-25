@@ -57,13 +57,13 @@ jobs:
             -destination "id=$SIM_UDID" -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO | xcbeautify
 
-      - name: Capture real iOS Simulator screenshots
+      - name: Capture real iOS Simulator screenshots (Light Theme)
         run: |
           set -euo pipefail
           mkdir -p dist/screenshots
           xcrun simctl boot "$SIM_UDID" || true
           xcrun simctl bootstatus "$SIM_UDID" -b
-          xcrun simctl ui "$SIM_UDID" appearance dark || true
+          xcrun simctl ui "$SIM_UDID" appearance light || true
           xcrun simctl status_bar "$SIM_UDID" override \
             --time "9:41" \
             --dataNetwork wifi \
@@ -89,8 +89,9 @@ jobs:
 
           capture_screen "dashboard" "01-two-day-dashboard.png"
           capture_screen "dial" "02-dual-thumb-dial.png"
-          capture_screen "widget" "03-home-widgets-and-bedtime.png"
-          capture_screen "byok" "04-byok-llm-and-calendar.png"
+          capture_screen "calendar" "03-builtin-calendar-events.png"
+          capture_screen "settings" "04-external-and-ios-calendar-settings.png"
+          capture_screen "widget" "05-widgets-and-byok.png"
           ls -lh dist/screenshots/
 
       - name: Build for device & package unsigned IPA
