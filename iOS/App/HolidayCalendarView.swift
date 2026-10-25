@@ -415,7 +415,7 @@ public struct HolidayCalendarView: View {
     // MARK: - Helpers
 
     private var filteredEntries: [HolidayCalendarEntry] {
-        let prefix = String(format: "%04d-%02d", displayYear, displayMonth)
+        let prefix = String(format: "%04d-%02d", displayedYear, displayedMonth)
         let all = viewModel.snapshot.holidayEntries.sorted { a, b in
             let aInMonth = a.date.hasPrefix(prefix)
             let bInMonth = b.date.hasPrefix(prefix)
