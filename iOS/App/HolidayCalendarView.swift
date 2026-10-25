@@ -415,7 +415,13 @@ public struct HolidayCalendarView: View {
     // MARK: - Helpers
 
     private var filteredEntries: [HolidayCalendarEntry] {
-        let all = viewModel.snapshot.holidayEntries
+        let prefix = String(format: "%04d-%02d", displayYear, displayMonth)
+        let all = viewModel.snapshot.holidayEntries.sorted { a, b in
+            let aInMonth = a.date.hasPrefix(prefix)
+            let bInMonth = b.date.hasPrefix(prefix)
+            if aInMonth != bInMonth { return aInMonth }
+            return a.date < b.date
+        }
         switch filterRollerIndex {
         case 1:
             return all.filter { $0.kind == .publicHoliday }

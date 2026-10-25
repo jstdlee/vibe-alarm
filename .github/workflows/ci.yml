@@ -81,10 +81,18 @@ jobs:
           capture_screen() {
             local mode="$1"
             local out="$2"
-            xcrun simctl terminate "$SIM_UDID" com.jstdlee.vibealarm || true
-            xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode"
-            sleep 3
-            xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
+            for attempt in 1 2 3; do
+              xcrun simctl terminate "$SIM_UDID" com.jstdlee.vibealarm || true
+              sleep 1
+              xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode"
+              sleep 4
+              xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
+              local sz=$(stat -f%z "dist/screenshots/$out" 2>/dev/null || echo 0)
+              echo "Captured $out (attempt $attempt, size=${sz}B)"
+              if [ "$sz" -gt 120000 ]; then
+                break
+              fi
+            done
           }
 
           capture_screen "dashboard" "01-two-day-dashboard.png"

@@ -49,7 +49,7 @@ struct VibeAlarmApp: App {
         case "settings":
             MainTabView(viewModel: viewModel, initialTab: .settings)
         case "widget":
-            WidgetAndBedtimeShowcaseView(viewModel: viewModel)
+            MainTabView(viewModel: viewModel, initialTab: .widget)
         case "byok":
             BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
         default:
@@ -58,22 +58,25 @@ struct VibeAlarmApp: App {
     }
 }
 
-// MARK: - Main 4-Tab Bar Navigation (Light Theme)
+// MARK: - Main Tab Bar Navigation (Light Theme)
 
 enum MainAppTab: Hashable {
     case dashboard
     case dial
     case calendar
     case settings
+    case widget
 }
 
 struct MainTabView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var selectedTab: MainAppTab
+    private let showWidgetTab: Bool
 
     init(viewModel: AppViewModel, initialTab: MainAppTab = .dashboard) {
         self.viewModel = viewModel
         _selectedTab = State(initialValue: initialTab)
+        self.showWidgetTab = (initialTab == .widget)
     }
 
     var body: some View {
@@ -101,13 +104,21 @@ struct MainTabView: View {
                     Label("日历源与权限", systemImage: "calendar.badge.checkmark")
                 }
                 .tag(MainAppTab.settings)
+
+            if showWidgetTab {
+                WidgetAndBedtimeShowcaseView(viewModel: viewModel)
+                    .tabItem {
+                        Label("小组件与AI", systemImage: "rectangle.grid.2x2.fill")
+                    }
+                    .tag(MainAppTab.widget)
+            }
         }
         .tint(.orange)
         .preferredColorScheme(.light)
     }
 }
 
-// MARK: - Native Showcase View for Interactive Widget & Bedtime Notification Preview (Light Theme)
+// MARK: - Native Showcase View for Interactive Widget, Bedtime Notification & BYOK AI Preview (Light Theme)
 
 struct WidgetAndBedtimeShowcaseView: View {
     @ObservedObject var viewModel: AppViewModel
