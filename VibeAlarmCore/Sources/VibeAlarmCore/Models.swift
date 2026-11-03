@@ -328,6 +328,10 @@ public struct ExternalCalendarSubscription: Codable, Identifiable, Equatable, Se
     public var regionHint: HolidayRegionHint
     public var lastSyncedAt: Date?
     public var isEnabled: Bool
+    /// Identifier of the `HolidayCatalogItem` this subscription was created from, if any.
+    /// Optional so legacy persisted JSON (which lacks the key) still decodes via the
+    /// synthesized `decodeIfPresent` path and existing users keep their data.
+    public var catalogID: String?
 
     public init(
         id: UUID = UUID(),
@@ -335,7 +339,8 @@ public struct ExternalCalendarSubscription: Codable, Identifiable, Equatable, Se
         url: String,
         regionHint: HolidayRegionHint = .custom,
         lastSyncedAt: Date? = nil,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        catalogID: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -343,6 +348,7 @@ public struct ExternalCalendarSubscription: Codable, Identifiable, Equatable, Se
         self.regionHint = regionHint
         self.lastSyncedAt = lastSyncedAt
         self.isEnabled = isEnabled
+        self.catalogID = catalogID
     }
 
     public static let defaultPresets: [ExternalCalendarSubscription] = [

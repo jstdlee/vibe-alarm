@@ -338,6 +338,33 @@ public final class AppViewModel: ObservableObject {
         applySnapshot(copy)
     }
 
+    // MARK: - Built-in Holiday Catalog Subscriptions
+
+    /// Whether a subscription with the same ICS URL as the catalog item already exists.
+    public func isSubscribed(_ item: HolidayCatalogItem) -> Bool {
+        snapshot.subscriptions.contains { $0.url.caseInsensitiveCompare(item.icsURL) == .orderedSame }
+    }
+
+    /// Creates and enables a subscription for a built-in catalog item (no duplicates by URL),
+    /// then triggers the existing ICS refresh path.
+    public func subscribe(to item: HolidayCatalogItem) {
+        if !isSubscribed(item) {
+            var copy = snapshot
+            copy.subscriptions.append(
+                ExternalCalendarSubscription(
+                    name: item.countryName,
+                    url: item.icsURL,
+                    regionHint: HolidayCatalog.regionHint(for: item),
+                    lastSyncedAt: nil,
+                    isEnabled: true,
+                    catalogID: item.id
+                )
+            )
+            applySnapshot(copy)
+        }
+        Task { await syncExternalSubscriptions() }
+    }
+
     public func toggleSubscription(id: UUID, isEnabled: Bool) {
         var copy = snapshot
         if let idx = copy.subscriptions.firstIndex(where: { $0.id == id }) {

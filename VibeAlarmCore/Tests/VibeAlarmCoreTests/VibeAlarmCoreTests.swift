@@ -303,4 +303,80 @@ final class VibeAlarmCoreTests: XCTestCase {
         let defaultFire = engine.snoozeFireDate(after: base, rule: AlarmRule())
         XCTAssertEqual(defaultFire.timeIntervalSince(base), 8 * 60, accuracy: 0.5)
     }
+
+    // MARK: - Holiday Catalog Tests
+
+    func testHolidayCatalogHasAtLeastFiftyItems() {
+        XCTAssertGreaterThanOrEqual(HolidayCatalog.all.count, 50)
+    }
+
+    func testHolidayCatalogISOAndSlugPairsAreUnique() {
+        var seen = Set<String>()
+        for item in HolidayCatalog.all {
+            let key = "\(item.isoCode)|\(item.googleSlug)"
+            XCTAssertFalse(seen.contains(key), "Duplicate ISO+slug pair: \(key)")
+            seen.insert(key)
+        }
+        XCTAssertEqual(seen.count, HolidayCatalog.all.count)
+    }
+
+    func testHolidayCatalogURLsAreValidHTTPS() {
+        for item in HolidayCatalog.all {
+            let url = URL(string: item.icsURL)
+            XCTAssertNotNil(url, "Invalid URL for \(item.countryName): \(item.icsURL)")
+            XCTAssertEqual(url?.scheme, "https", "Non-HTTPS URL for \(item.countryName)")
+        }
+    }
+
+    func testHolidayCatalogSearchMatchesISOCaseInsensitivelyAndByName() {
+        XCTAssertTrue(HolidayCatalog.search("sg").contains { $0.isoCode == "SG" })
+        XCTAssertTrue(HolidayCatalog.search("SG").contains { $0.isoCode == "SG" })
+        XCTAssertTrue(HolidayCatalog.search("sing").contains { $0.countryName.contains("Singapore") })
+
+        let united = HolidayCatalog.search("united")
+        XCTAssertTrue(united.contains { $0.isoCode == "US" })
+        XCTAssertTrue(united.contains { $0.isoCode == "GB" })
+        XCTAssertTrue(united.contains { $0.isoCode == "AE" })
+
+        XCTAssertTrue(HolidayCatalog.search("does-not-exist").isEmpty)
+
+        // Empty query returns the full list sorted by country name.
+        let everything = HolidayCatalog.search("")
+        XCTAssertEqual(everything.count, HolidayCatalog.all.count)
+    }
+
+    func testHolidayCatalogHasDedicatedChinaMakeupSourcePresentedFirst() {
+        let statutory = HolidayCatalog.all.first { $0.kind == .chinaStatutory }
+        XCTAssertNotNil(statutory)
+        XCTAssertEqual(statutory?.isoCode, "CN")
+        XCTAssertEqual(
+            statutory?.icsURL,
+            "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/2026.ics"
+        )
+
+        // Searching CN returns both the dedicated statutory source and the plain Google feed,
+        // with the makeup-aware statutory source presented first.
+        let cn = HolidayCatalog.search("cn")
+        XCTAssertEqual(cn.first?.kind, .chinaStatutory)
+        XCTAssertTrue(cn.contains { $0.kind == .google && $0.isoCode == "CN" })
+    }
+
+    func testHolidayCatalogGoogleURLEncodingIsPreserved() throws {
+        let sg = try XCTUnwrap(HolidayCatalog.all.first { $0.isoCode == "SG" })
+        XCTAssertEqual(
+            sg.icsURL,
+            "https://calendar.google.com/calendar/ical/en.singapore%23holiday%40group.v.calendar.google.com/public/basic.ics"
+        )
+    }
+
+    func testExternalCalendarSubscriptionDecodesMissingCatalogIDAsNil() throws {
+        let sub = ExternalCalendarSubscription(name: "Legacy", url: "https://example.com/a.ics")
+        let data = try JSONEncoder().encode(sub)
+        var dict = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        dict.removeValue(forKey: "catalogID")
+        let strippedData = try JSONSerialization.data(withJSONObject: dict)
+        let decoded = try JSONDecoder().decode(ExternalCalendarSubscription.self, from: strippedData)
+        XCTAssertNil(decoded.catalogID)
+        XCTAssertEqual(decoded.url, "https://example.com/a.ics")
+    }
 }
