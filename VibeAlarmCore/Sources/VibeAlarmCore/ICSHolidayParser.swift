@@ -1,7 +1,7 @@
 import Foundation
 
 /// Zero-dependency RFC 5545 iCalendar (`.ics`) parser that extracts public holidays,
-/// statutory makeup workdays (调休补班), and personal leave events into `HolidayCalendarEntry`.
+/// statutory makeup workdays, and personal leave events into `HolidayCalendarEntry`.
 public struct ICSHolidayParser: Sendable {
     private let calendar: Calendar
 
@@ -107,18 +107,14 @@ public struct ICSHolidayParser: Sendable {
     ) -> HolidayEntryKind {
         let combined = "\(summary) \(description) \(categories)".lowercased()
 
-        let makeupKeywords = [
-            "补班", "调休上班", "调休补班", "上班", "工作日", "make-up workday", "makeup workday", "working day"
-        ]
+        let makeupKeywords = ["makeup", "make-up", "working weekend", "working saturday", "working sunday"]
         for kw in makeupKeywords where combined.contains(kw) {
-            // Avoid misclassifying "不上班"
-            if !combined.contains("不上班") {
-                return .makeupWorkday
-            }
+            return .makeupWorkday
         }
 
         let leaveKeywords = [
-            "请假", "年假", "病假", "事假", "个人休假", "pto", "annual leave", "personal leave", "vacation", "out of office", "ooo"
+            "pto", "annual leave", "personal leave", "sick leave", "day off",
+            "vacation", "out of office", "ooo"
         ]
         for kw in leaveKeywords where combined.contains(kw) {
             return .personalLeave

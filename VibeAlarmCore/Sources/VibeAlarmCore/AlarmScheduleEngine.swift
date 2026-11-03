@@ -79,7 +79,7 @@ public struct AlarmScheduleEngine: Sendable {
         return results
     }
 
-    /// Convenience helper returning strictly Today and Tomorrow (最近两天闹钟).
+    /// Convenience helper returning strictly Today and Tomorrow.
     public func resolveTwoDayDashboard(
         rule: AlarmRule,
         entries: [HolidayCalendarEntry],
@@ -115,13 +115,13 @@ public struct AlarmScheduleEngine: Sendable {
             return ResolvedDayAlarm(
                 date: dateString,
                 displayLabel: displayLabel,
-                weekdayText: wday.shortChineseName,
+                weekdayText: wday.shortWeekdayName,
                 baseTime: baseTimeStr,
                 effectiveTime: nil,
                 effectiveHour: nil,
                 effectiveMinute: nil,
                 status: .noAlarm,
-                reasonBadge: "闹钟总开关已关闭",
+                reasonBadge: "Alarm Disabled",
                 hasManualOverride: false,
                 matchedEntries: dayEntries
             )
@@ -134,13 +134,13 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .skippedManually,
-                    reasonBadge: rule.autoRestoreNextDay ? "已手动跳过 · 次日自动恢复" : "已手动跳过本次闹钟",
+                    reasonBadge: rule.autoRestoreNextDay ? "Manually Skipped · Auto-Restores Tomorrow" : "Manually Skipped This Time",
                     hasManualOverride: true,
                     matchedEntries: dayEntries
                 )
@@ -151,15 +151,15 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: effStr,
                     effectiveHour: newH,
                     effectiveMinute: newM,
                     status: .delayed(minutes: delayMinutes),
                     reasonBadge: rule.autoRestoreNextDay
-                        ? "已推迟 (\(sign)) · 次日自动恢复 \(baseTimeStr)"
-                        : "单次推迟 (\(sign))",
+                        ? "Delayed (\(sign)) · Auto-Restores to \(baseTimeStr)"
+                        : "One-Time Delay (\(sign))",
                     hasManualOverride: true,
                     matchedEntries: dayEntries
                 )
@@ -167,13 +167,13 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: baseTimeStr,
                     effectiveHour: rule.hour,
                     effectiveMinute: rule.minute,
                     status: .scheduled,
-                    reasonBadge: "手动保持响铃 (忽略假期跳过)",
+                    reasonBadge: "Manually Kept Ringing (Overrides Holiday Skip)",
                     hasManualOverride: true,
                     matchedEntries: dayEntries
                 )
@@ -190,20 +190,20 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .skippedByPersonalLeave(reason: leaveEntry.title),
-                    reasonBadge: "\(leaveEntry.title) · 自动跳过",
+                    reasonBadge: "\(leaveEntry.title) · Auto-Skipped",
                     hasManualOverride: false,
                     matchedEntries: dayEntries
                 )
             }
         }
 
-        // 3. Check Public Holiday & Statutory Makeup Workday (调休补班)
+        // 3. Check Public Holiday & Statutory Makeup Workday
         let makeupEntry = dayEntries.first(where: { $0.kind == .makeupWorkday })
         let publicHolidayEntry = dayEntries.first(where: { $0.kind == .publicHoliday })
 
@@ -214,13 +214,13 @@ public struct AlarmScheduleEngine: Sendable {
                     return ResolvedDayAlarm(
                         date: dateString,
                         displayLabel: displayLabel,
-                        weekdayText: wday.shortChineseName,
+                        weekdayText: wday.shortWeekdayName,
                         baseTime: baseTimeStr,
                         effectiveTime: nil,
                         effectiveHour: nil,
                         effectiveMinute: nil,
                         status: .skippedByHoliday(reason: holiday.title),
-                        reasonBadge: "\(holiday.title) · 假期自动跳过",
+                        reasonBadge: "\(holiday.title) · Holiday Auto-Skip",
                         hasManualOverride: false,
                         matchedEntries: dayEntries
                     )
@@ -230,13 +230,13 @@ public struct AlarmScheduleEngine: Sendable {
                         return ResolvedDayAlarm(
                             date: dateString,
                             displayLabel: displayLabel,
-                            weekdayText: wday.shortChineseName,
+                            weekdayText: wday.shortWeekdayName,
                             baseTime: baseTimeStr,
                             effectiveTime: baseTimeStr,
                             effectiveHour: rule.hour,
                             effectiveMinute: rule.minute,
                             status: .scheduled,
-                            reasonBadge: "\(makeup.title) · 调休自动开启",
+                            reasonBadge: "\(makeup.title) · Makeup Workday Auto-Enabled",
                             hasManualOverride: false,
                             matchedEntries: dayEntries
                         )
@@ -244,13 +244,13 @@ public struct AlarmScheduleEngine: Sendable {
                         return ResolvedDayAlarm(
                             date: dateString,
                             displayLabel: displayLabel,
-                            weekdayText: wday.shortChineseName,
+                            weekdayText: wday.shortWeekdayName,
                             baseTime: baseTimeStr,
                             effectiveTime: nil,
                             effectiveHour: nil,
                             effectiveMinute: nil,
                             status: .noAlarm,
-                            reasonBadge: "周末休息 · 不响铃",
+                            reasonBadge: "Weekend Rest · No Alarm",
                             hasManualOverride: false,
                             matchedEntries: dayEntries
                         )
@@ -260,13 +260,13 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .noAlarm,
-                    reasonBadge: "周末休息 · 不响铃",
+                    reasonBadge: "Weekend Rest · No Alarm",
                     hasManualOverride: false,
                     matchedEntries: dayEntries
                 )
@@ -275,13 +275,13 @@ public struct AlarmScheduleEngine: Sendable {
             return ResolvedDayAlarm(
                 date: dateString,
                 displayLabel: displayLabel,
-                weekdayText: wday.shortChineseName,
+                weekdayText: wday.shortWeekdayName,
                 baseTime: baseTimeStr,
                 effectiveTime: baseTimeStr,
                 effectiveHour: rule.hour,
                 effectiveMinute: rule.minute,
                 status: .scheduled,
-                reasonBadge: "工作日正常响铃",
+                reasonBadge: "Workday · Normal Ring",
                 hasManualOverride: false,
                 matchedEntries: dayEntries
             )
@@ -291,13 +291,13 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .skippedByHoliday(reason: holiday.title),
-                    reasonBadge: "\(holiday.title) · 假期自动跳过",
+                    reasonBadge: "\(holiday.title) · Holiday Auto-Skip",
                     hasManualOverride: false,
                     matchedEntries: dayEntries
                 )
@@ -305,13 +305,13 @@ public struct AlarmScheduleEngine: Sendable {
             return ResolvedDayAlarm(
                 date: dateString,
                 displayLabel: displayLabel,
-                weekdayText: wday.shortChineseName,
+                weekdayText: wday.shortWeekdayName,
                 baseTime: baseTimeStr,
                 effectiveTime: baseTimeStr,
                 effectiveHour: rule.hour,
                 effectiveMinute: rule.minute,
                 status: .scheduled,
-                reasonBadge: "每日闹钟 · 正常响铃",
+                reasonBadge: "Daily Alarm · Normal Ring",
                 hasManualOverride: false,
                 matchedEntries: dayEntries
             )
@@ -322,13 +322,13 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .noAlarm,
-                    reasonBadge: "非设定重复日 · 不响铃",
+                    reasonBadge: "Not a Repeat Day · No Alarm",
                     hasManualOverride: false,
                     matchedEntries: dayEntries
                 )
@@ -337,22 +337,22 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .skippedByHoliday(reason: holiday.title),
-                    reasonBadge: "\(holiday.title) · 假期自动跳过",
+                    reasonBadge: "\(holiday.title) · Holiday Auto-Skip",
                     hasManualOverride: false,
                     matchedEntries: dayEntries
                 )
             }
-            let badge = isMakeup ? "\(makeupEntry!.title) · 调休自动开启" : "按周排期 · 正常响铃"
+            let badge = isMakeup ? "\(makeupEntry!.title) · Makeup Workday Auto-Enabled" : "Weekly Schedule · Normal Ring"
             return ResolvedDayAlarm(
                 date: dateString,
                 displayLabel: displayLabel,
-                weekdayText: wday.shortChineseName,
+                weekdayText: wday.shortWeekdayName,
                 baseTime: baseTimeStr,
                 effectiveTime: baseTimeStr,
                 effectiveHour: rule.hour,
@@ -368,13 +368,13 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .noAlarm,
-                    reasonBadge: "非指定日期 · 不响铃",
+                    reasonBadge: "Not a Selected Date · No Alarm",
                     hasManualOverride: false,
                     matchedEntries: dayEntries
                 )
@@ -383,13 +383,13 @@ public struct AlarmScheduleEngine: Sendable {
                 return ResolvedDayAlarm(
                     date: dateString,
                     displayLabel: displayLabel,
-                    weekdayText: wday.shortChineseName,
+                    weekdayText: wday.shortWeekdayName,
                     baseTime: baseTimeStr,
                     effectiveTime: nil,
                     effectiveHour: nil,
                     effectiveMinute: nil,
                     status: .skippedByHoliday(reason: holiday.title),
-                    reasonBadge: "\(holiday.title) · 假期自动跳过",
+                    reasonBadge: "\(holiday.title) · Holiday Auto-Skip",
                     hasManualOverride: false,
                     matchedEntries: dayEntries
                 )
@@ -397,13 +397,13 @@ public struct AlarmScheduleEngine: Sendable {
             return ResolvedDayAlarm(
                 date: dateString,
                 displayLabel: displayLabel,
-                weekdayText: wday.shortChineseName,
+                weekdayText: wday.shortWeekdayName,
                 baseTime: baseTimeStr,
                 effectiveTime: baseTimeStr,
                 effectiveHour: rule.hour,
                 effectiveMinute: rule.minute,
                 status: .scheduled,
-                reasonBadge: "指定日期 · 正常响铃",
+                reasonBadge: "Selected Date · Normal Ring",
                 hasManualOverride: false,
                 matchedEntries: dayEntries
             )
@@ -431,14 +431,23 @@ public struct AlarmScheduleEngine: Sendable {
 
     private func relativeLabel(forOffset offset: Int, date: Date) -> String {
         switch offset {
-        case 0: return "今天"
-        case 1: return "明天"
-        case 2: return "后天"
+        case 0: return "Today"
+        case 1: return "Tomorrow"
+        case 2: return "In 2 Days"
         default:
             let m = calendar.component(.month, from: date)
             let d = calendar.component(.day, from: date)
-            return "\(m)月\(d)日"
+            return "\(Self.monthAbbreviation(m)) \(d)"
         }
+    }
+
+    private static let monthAbbreviations = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    private static func monthAbbreviation(_ month: Int) -> String {
+        guard (1...12).contains(month) else { return "" }
+        return monthAbbreviations[month - 1]
     }
 
     public static func addMinutes(hour: Int, minute: Int, delta: Int) -> (hour: Int, minute: Int) {

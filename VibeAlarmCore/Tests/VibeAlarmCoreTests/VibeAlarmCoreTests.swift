@@ -17,7 +17,7 @@ final class VibeAlarmCoreTests: XCTestCase {
 
     func testPublicHolidaySkipsWeekdayAlarmAndMakeupWorkdayActivatesWeekendAlarm() throws {
         let rule = AlarmRule(
-            label: "早起上班",
+            label: "Morning Commute",
             hour: 7,
             minute: 30,
             isEnabled: true,
@@ -27,8 +27,8 @@ final class VibeAlarmCoreTests: XCTestCase {
         )
 
         let entries: [HolidayCalendarEntry] = [
-            HolidayCalendarEntry(date: "2026-10-07", title: "国庆节假期", kind: .publicHoliday, source: .builtin),
-            HolidayCalendarEntry(date: "2026-10-10", title: "国庆节调休补班", kind: .makeupWorkday, source: .builtin)
+            HolidayCalendarEntry(date: "2026-10-07", title: "National Day Holiday", kind: .publicHoliday, source: .builtin),
+            HolidayCalendarEntry(date: "2026-10-10", title: "National Day Makeup Workday", kind: .makeupWorkday, source: .builtin)
         ]
 
         // 2026-10-07 is a Wednesday (Public Holiday -> should skip)
@@ -44,7 +44,7 @@ final class VibeAlarmCoreTests: XCTestCase {
         XCTAssertEqual(scheduleFromOct7.count, 4)
         // Day 0: Wed Oct 7 -> Skipped by public holiday
         XCTAssertEqual(scheduleFromOct7[0].date, "2026-10-07")
-        XCTAssertEqual(scheduleFromOct7[0].status, .skippedByHoliday(reason: "国庆节假期"))
+        XCTAssertEqual(scheduleFromOct7[0].status, .skippedByHoliday(reason: "National Day Holiday"))
         XCTAssertNil(scheduleFromOct7[0].effectiveTime)
 
         // Day 1: Thu Oct 8 -> Normal workday -> Scheduled 07:30
@@ -56,7 +56,7 @@ final class VibeAlarmCoreTests: XCTestCase {
         XCTAssertEqual(scheduleFromOct7[3].date, "2026-10-10")
         XCTAssertEqual(scheduleFromOct7[3].status, .scheduled)
         XCTAssertEqual(scheduleFromOct7[3].effectiveTime, "07:30")
-        XCTAssertTrue(scheduleFromOct7[3].reasonBadge.contains("调休"))
+        XCTAssertTrue(scheduleFromOct7[3].reasonBadge.contains("Makeup"))
     }
 
     func testOneClickDelayAndSkipTomorrowAutoRestoresDayAfterTomorrow() throws {
@@ -99,7 +99,7 @@ final class VibeAlarmCoreTests: XCTestCase {
     func testPersonalLeaveSkipsWorkdayAlarmUnlessForceKept() throws {
         let rule = AlarmRule(hour: 8, minute: 0, repeatMode: .weekdays, skipPersonalLeave: true)
         let entries = [
-            HolidayCalendarEntry(date: "2026-10-27", title: "个人年假", kind: .personalLeave, source: .localEventKit)
+            HolidayCalendarEntry(date: "2026-10-27", title: "Annual Leave", kind: .personalLeave, source: .localEventKit)
         ]
         let monday = try XCTUnwrap(engine.date(from: "2026-10-26"))
 
@@ -109,7 +109,7 @@ final class VibeAlarmCoreTests: XCTestCase {
             override: nil,
             referenceDate: monday
         )
-        XCTAssertEqual(tomorrowSkipped.status, .skippedByPersonalLeave(reason: "个人年假"))
+        XCTAssertEqual(tomorrowSkipped.status, .skippedByPersonalLeave(reason: "Annual Leave"))
         XCTAssertNil(tomorrowSkipped.effectiveTime)
 
         // Force keep tomorrow overrides personal leave
@@ -131,18 +131,18 @@ final class VibeAlarmCoreTests: XCTestCase {
         let sampleICS = """
         BEGIN:VCALENDAR
         VERSION:2.0
-        PRODID:-//VibeAlarm//CN Holidays//ZH
+        PRODID:-//VibeAlarm//Holidays//EN
         BEGIN:VEVENT
         DTSTART;VALUE=DATE:20261001
         DTEND;VALUE=DATE:20261004
-        SUMMARY:国庆节放假
-        DESCRIPTION:法定节假日
+        SUMMARY:National Day Holiday
+        DESCRIPTION:Statutory Holiday
         END:VEVENT
         BEGIN:VEVENT
         DTSTART;VALUE=DATE:20261010
         DTEND;VALUE=DATE:20261011
-        SUMMARY:国庆节调休补班
-        DESCRIPTION:周六补班
+        SUMMARY:National Day Makeup Workday
+        DESCRIPTION:Saturday Makeup Workday
         END:VEVENT
         END:VCALENDAR
         """
@@ -156,7 +156,7 @@ final class VibeAlarmCoreTests: XCTestCase {
 
         XCTAssertEqual(holidays.map(\.date), ["2026-10-01", "2026-10-02", "2026-10-03"])
         XCTAssertEqual(makeups.map(\.date), ["2026-10-10"])
-        XCTAssertEqual(makeups.first?.title, "国庆节调休补班")
+        XCTAssertEqual(makeups.first?.title, "National Day Makeup Workday")
     }
 
     // MARK: - BYOK Service & Offline Parser Tests
@@ -165,8 +165,9 @@ final class VibeAlarmCoreTests: XCTestCase {
         let service = BYOKHolidayService(calendar: calendar)
         let refDate = try XCTUnwrap(engine.date(from: "2026-10-24"))
         let text = """
-        HR通知：我将在 2026年10月26日到10月28日休年假，10月31日周六调休补班。
-        另外附公司公共日历订阅：webcal://calendar.example.com/company-holidays.ics
+        HR Notice: I will take annual leave from October 26 to 28, 2026.
+        I will work a makeup shift on Saturday, October 31, 2026.
+        Company calendar subscription: webcal://calendar.example.com/company-holidays.ics
         """
 
         let result = service.parseLocally(text: text, referenceDate: refDate)
@@ -186,7 +187,7 @@ final class VibeAlarmCoreTests: XCTestCase {
           "choices": [
             {
               "message": {
-                "content": "```json\\n{\\"entries\\":[{\\"date\\":\\"2026-11-09\\",\\"title\\":\\"屠妖节补休\\",\\"kind\\":\\"publicHoliday\\"}],\\"discoveredCalendarURLs\\":[],\\"summaryNote\\":\\"已提取新加坡屠妖节补休\\"}\\n```"
+                "content": "```json\\n{\\"entries\\":[{\\"date\\":\\"2026-11-09\\",\\"title\\":\\"Deepavali Observed\\",\\"kind\\":\\"publicHoliday\\"}],\\"discoveredCalendarURLs\\":[],\\"summaryNote\\":\\"Extracted Singapore Deepavali Observed holiday\\"}\\n```"
               }
             }
           ]
@@ -196,9 +197,9 @@ final class VibeAlarmCoreTests: XCTestCase {
         let parsed = try service.parseLLMResponseData(mockOpenAIJSON, provider: .openAICompatible)
         XCTAssertEqual(parsed.entries.count, 1)
         XCTAssertEqual(parsed.entries.first?.date, "2026-11-09")
-        XCTAssertEqual(parsed.entries.first?.title, "屠妖节补休")
+        XCTAssertEqual(parsed.entries.first?.title, "Deepavali Observed")
         XCTAssertEqual(parsed.entries.first?.kind, .publicHoliday)
-        XCTAssertEqual(parsed.summaryNote, "已提取新加坡屠妖节补休")
+        XCTAssertEqual(parsed.summaryNote, "Extracted Singapore Deepavali Observed holiday")
     }
 
     // MARK: - SharedAlarmStore Tests

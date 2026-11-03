@@ -50,7 +50,7 @@ struct VibeAlarmTimelineProvider: TimelineProvider {
     }
 }
 
-// MARK: - Widget View (Small & Medium — Apple Native Light Clock Aesthetic)
+// MARK: - Widget View (Small & Medium — Braun / Apple Light Clock Aesthetic)
 
 struct VibeAlarmWidgetEntryView: View {
     var entry: VibeAlarmWidgetEntry
@@ -66,28 +66,25 @@ struct VibeAlarmWidgetEntryView: View {
             }
         }
         .containerBackground(for: .widget) {
-            Color.white
+            Color.vibeCard
         }
     }
 
     private var smallView: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Image(systemName: "alarm.fill")
-                    .font(.caption2)
-                Text("明日 · \(entry.tomorrow.weekdayText)")
-                    .font(.caption.weight(.semibold))
-            }
-            .foregroundStyle(.orange)
+            Text("TOMORROW · \(entry.tomorrow.weekdayText.uppercased())")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(.vibeAccent)
 
             Spacer(minLength: 0)
 
-            Text(entry.tomorrow.effectiveTime ?? entry.tomorrow.baseTime)
-                .font(.system(size: 34, weight: .light, design: .rounded))
+            Text(entry.tomorrow.status.isRinging ? (entry.tomorrow.effectiveTime ?? entry.tomorrow.baseTime) : "OFF")
+                .font(.system(size: 32, weight: .light, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(entry.tomorrow.status.isRinging ? Color.primary : Color.secondary)
+                .foregroundStyle(entry.tomorrow.status.isRinging ? Color.vibeInk : Color.vibeInkMuted)
 
-            Text(entry.tomorrow.status.isRinging ? entry.tomorrow.reasonBadge : "不响铃 · \(entry.tomorrow.reasonBadge)")
+            Text(entry.tomorrow.reasonBadge)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -96,21 +93,21 @@ struct VibeAlarmWidgetEntryView: View {
 
             HStack(spacing: 6) {
                 Button(intent: SkipTomorrowIntent()) {
-                    Text("跳过")
+                    Text("Skip")
                         .font(.caption2.weight(.medium))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(.orange)
+                .tint(.vibeAccent)
 
                 if entry.tomorrow.hasManualOverride {
                     Button(intent: RestoreTomorrowIntent()) {
-                        Text("恢复")
+                        Text("Restore")
                             .font(.caption2.weight(.medium))
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.orange)
+                    .tint(.vibeAccent)
                 } else {
                     Button(intent: DelayTomorrow30Intent()) {
                         Text("+30m")
@@ -118,7 +115,7 @@ struct VibeAlarmWidgetEntryView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .tint(.orange)
+                    .tint(.vibeAccent)
                 }
             }
         }
@@ -135,48 +132,53 @@ struct VibeAlarmWidgetEntryView: View {
 
             HStack(spacing: 8) {
                 Button(intent: SkipTomorrowIntent()) {
-                    Text("跳过明日")
+                    Text("Skip")
                         .font(.caption.weight(.medium))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(.orange)
+                .tint(.vibeAccent)
 
                 Button(intent: DelayTomorrow30Intent()) {
-                    Text("推迟 30 分钟")
+                    Text("+30m")
                         .font(.caption.weight(.medium))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(.orange)
+                .tint(.vibeAccent)
+
+                Button(intent: DelayTomorrow60Intent()) {
+                    Text("+1h")
+                        .font(.caption.weight(.medium))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.vibeAccent)
 
                 Button(intent: RestoreTomorrowIntent()) {
-                    Text("恢复原定")
+                    Text("Restore")
                         .font(.caption.weight(.medium))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(entry.tomorrow.hasManualOverride ? Color.orange : Color.secondary)
+                .tint(entry.tomorrow.hasManualOverride ? Color.vibeAccent : Color.secondary)
             }
         }
     }
 
     private func dayBlock(day: ResolvedDayAlarm, isTomorrow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Image(systemName: "alarm.fill")
-                    .font(.caption2)
-                Text("\(day.displayLabel) · \(day.weekdayText)")
-                    .font(.caption.weight(.semibold))
-            }
-            .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
+            Text("\(isTomorrow ? "TOMORROW" : "TODAY") · \(day.weekdayText.uppercased())")
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(isTomorrow ? Color.vibeAccent : Color.vibeInkMuted)
 
-            Text(day.effectiveTime ?? day.baseTime)
-                .font(.system(size: 32, weight: .light, design: .rounded))
+            Text(day.status.isRinging ? (day.effectiveTime ?? day.baseTime) : "OFF")
+                .font(.system(size: 30, weight: .light, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(day.status.isRinging ? Color.primary : Color.secondary)
+                .foregroundStyle(day.status.isRinging ? Color.vibeInk : Color.vibeInkMuted)
 
-            Text(day.status.isRinging ? day.reasonBadge : "不响铃 · \(day.reasonBadge)")
+            Text(day.reasonBadge)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -201,8 +203,8 @@ struct VibeAlarmTwoDayWidget: Widget {
         StaticConfiguration(kind: kind, provider: VibeAlarmTimelineProvider()) { entry in
             VibeAlarmWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("近两日闹钟")
-        .description("查看今明两日闹钟状态，支持在桌面跳过明日、推迟 30 分钟或恢复原定排期。")
+        .configurationDisplayName("Two-Day Alarm")
+        .description("See today and tomorrow's alarm at a glance. Skip, delay, or restore tomorrow right from the Home Screen.")
         .supportedFamilies([.systemMedium, .systemSmall])
     }
 }

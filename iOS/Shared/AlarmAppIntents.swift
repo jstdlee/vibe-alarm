@@ -6,8 +6,8 @@ import WidgetKit
 // MARK: - Interactive Widget & Shortcuts Intents (iOS 17+ AppIntents)
 
 public struct SkipTomorrowIntent: AppIntent {
-    public static var title: LocalizedStringResource = "跳过明日闹钟"
-    public static var description = IntentDescription("一键跳过明天的早起闹钟，后天自动恢复原定排期。")
+    public static var title: LocalizedStringResource = "Skip Tomorrow's Alarm"
+    public static var description = IntentDescription("Skips tomorrow's wake alarm in one tap. The day after tomorrow automatically restores the normal schedule.")
     public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -17,13 +17,13 @@ public struct SkipTomorrowIntent: AppIntent {
         let snapshot = try store.setTomorrowOverride(action: .skipTomorrow)
         await AlarmNotificationScheduler.syncNotifications(for: snapshot)
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "已跳过明日闹钟，后天将自动恢复正常排期。")
+        return .result(dialog: "Tomorrow's alarm has been skipped. It will automatically restore the day after.")
     }
 }
 
 public struct DelayTomorrow30Intent: AppIntent {
-    public static var title: LocalizedStringResource = "推迟明日闹钟 30 分钟"
-    public static var description = IntentDescription("将明天的闹钟推迟 30 分钟，后天自动恢复原定时间。")
+    public static var title: LocalizedStringResource = "Delay Tomorrow's Alarm 30 Minutes"
+    public static var description = IntentDescription("Delays tomorrow's alarm by 30 minutes. The day after tomorrow automatically restores the original time.")
     public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -41,13 +41,13 @@ public struct DelayTomorrow30Intent: AppIntent {
         let snapshot = try store.setTomorrowOverride(action: .delayTomorrow(minutes: baseDelay))
         await AlarmNotificationScheduler.syncNotifications(for: snapshot)
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "已将明日闹钟推迟 \(baseDelay) 分钟，后天自动恢复。")
+        return .result(dialog: "Tomorrow's alarm has been delayed by \(baseDelay) minutes. It will automatically restore the day after.")
     }
 }
 
 public struct DelayTomorrow60Intent: AppIntent {
-    public static var title: LocalizedStringResource = "推迟明日闹钟 1 小时"
-    public static var description = IntentDescription("将明天的闹钟推迟 60 分钟，后天自动恢复原定时间。")
+    public static var title: LocalizedStringResource = "Delay Tomorrow's Alarm 1 Hour"
+    public static var description = IntentDescription("Delays tomorrow's alarm by 60 minutes. The day after tomorrow automatically restores the original time.")
     public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -57,13 +57,13 @@ public struct DelayTomorrow60Intent: AppIntent {
         let snapshot = try store.setTomorrowOverride(action: .delayTomorrow(minutes: 60))
         await AlarmNotificationScheduler.syncNotifications(for: snapshot)
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "已将明日闹钟推迟 1 小时，后天自动恢复。")
+        return .result(dialog: "Tomorrow's alarm has been delayed by 1 hour. It will automatically restore the day after.")
     }
 }
 
 public struct RestoreTomorrowIntent: AppIntent {
-    public static var title: LocalizedStringResource = "恢复明日原定闹钟"
-    public static var description = IntentDescription("清除对明日闹钟的临时推迟或跳过，恢复智能假期排期。")
+    public static var title: LocalizedStringResource = "Restore Tomorrow's Alarm"
+    public static var description = IntentDescription("Clears any temporary delay or skip on tomorrow's alarm, restoring the smart holiday schedule.")
     public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -73,13 +73,13 @@ public struct RestoreTomorrowIntent: AppIntent {
         let snapshot = try store.setTomorrowOverride(action: .none)
         await AlarmNotificationScheduler.syncNotifications(for: snapshot)
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "已恢复明日原定闹钟排期。")
+        return .result(dialog: "Tomorrow's alarm has been restored to its normal schedule.")
     }
 }
 
 public struct ForceKeepTomorrowIntent: AppIntent {
-    public static var title: LocalizedStringResource = "强制保持明日闹钟"
-    public static var description = IntentDescription("即使明天是节假日或请假，也强制按基础时间响铃。")
+    public static var title: LocalizedStringResource = "Keep Tomorrow's Alarm On"
+    public static var description = IntentDescription("Keeps tomorrow's alarm ringing at the base time even if it's a holiday or leave day.")
     public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -89,7 +89,7 @@ public struct ForceKeepTomorrowIntent: AppIntent {
         let snapshot = try store.setTomorrowOverride(action: .forceKeepTomorrow)
         await AlarmNotificationScheduler.syncNotifications(for: snapshot)
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "已设置明天强制按时响铃。")
+        return .result(dialog: "Tomorrow's alarm will ring on schedule, regardless of holiday or leave status.")
     }
 }
 
@@ -100,36 +100,36 @@ public struct VibeAlarmShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: SkipTomorrowIntent(),
             phrases: [
-                "用 \(.applicationName) 跳过明天闹钟",
-                "取消明天的 \(.applicationName)"
+                "Skip tomorrow's alarm with \(.applicationName)",
+                "Cancel tomorrow's \(.applicationName) alarm"
             ],
-            shortTitle: "跳过明日闹钟",
+            shortTitle: "Skip Tomorrow",
             systemImageName: "bell.slash.fill"
         )
         AppShortcut(
             intent: DelayTomorrow30Intent(),
             phrases: [
-                "用 \(.applicationName) 推迟明天闹钟半小时",
-                "明天 \(.applicationName) 晚半小时响"
+                "Delay tomorrow's alarm half an hour with \(.applicationName)",
+                "Make tomorrow's \(.applicationName) alarm 30 minutes later"
             ],
-            shortTitle: "推迟明日 +30m",
+            shortTitle: "Delay +30m",
             systemImageName: "clock.arrow.circlepath"
         )
         AppShortcut(
             intent: DelayTomorrow60Intent(),
             phrases: [
-                "用 \(.applicationName) 推迟明天闹钟一小时"
+                "Delay tomorrow's alarm one hour with \(.applicationName)"
             ],
-            shortTitle: "推迟明日 +1h",
+            shortTitle: "Delay +1h",
             systemImageName: "plus.circle.fill"
         )
         AppShortcut(
             intent: RestoreTomorrowIntent(),
             phrases: [
-                "恢复明天的 \(.applicationName)",
-                "用 \(.applicationName) 恢复次日闹钟"
+                "Restore tomorrow's \(.applicationName) alarm",
+                "Reset tomorrow's alarm with \(.applicationName)"
             ],
-            shortTitle: "恢复次日闹钟",
+            shortTitle: "Restore Tomorrow",
             systemImageName: "arrow.uturn.backward.circle.fill"
         )
     }

@@ -2,11 +2,11 @@ import SwiftUI
 import UIKit
 import VibeAlarmCore
 
-/// Ergonomic Skeuomorphic Dual-Thumb Time Picker Sheet / Tab (`设定时间`):
-/// - **Light Theme (`#F2F2F7` / `#FFFFFF` / Braun-Apple tactile metallic-ivory surfaces)**.
-/// - **Upper area**: Clean digital readout (`07 : 30`) + alarm label so no high thumb reach is required.
-/// - **Middle area**: Skeuomorphic Horizontal Roller Axes (`横向拟物滚动轴`) replacing traditional dropdowns for Repeat Mode (`重复周期`) and Smart Holiday Policy (`假期与调休策略`).
-/// - **Middle-Lower area**: Left & Right Semi-Circular Skeuomorphic Rotary Dials (`左右半圆拟物转盘`) anchored to the left and right edges of the lower half of the screen for effortless two-handed thumb rotation.
+/// Screen 2 ("Time Dial"): Ergonomic Braun/Apple Light Theme dual-thumb time picker.
+/// - **Top card**: digital readout + `Active` toggle, plus horizontal mechanical rollers for
+///   repeat mode and holiday policy.
+/// - **Lower thumb zone**: left (`HOUR`) and right (`MIN`) semi-circular rotary dials anchored
+///   to the screen edges, with a center quick-snap column.
 public struct DualThumbTimeDialSheet: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
@@ -20,42 +20,28 @@ public struct DualThumbTimeDialSheet: View {
     public var body: some View {
         NavigationStack {
             DualThumbTimeDialView(viewModel: viewModel)
-                .navigationTitle("设定闹钟时间")
+                .navigationTitle(isEmbeddedInTab ? "" : "Time Dial")
                 .navigationBarTitleDisplayMode(.inline)
+                .navigationBarHidden(isEmbeddedInTab)
                 .toolbar {
                     if !isEmbeddedInTab {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("取消") {
+                            Button("Cancel") {
                                 dismiss()
                             }
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.vibeAccent)
                         }
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("完成") {
+                            Button("Done") {
                                 dismiss()
                             }
                             .fontWeight(.semibold)
-                            .foregroundStyle(.orange)
-                        }
-                    } else {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Text("双手拇指拟物拨盘")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button {
-                                viewModel.showBanner("已保存闹钟 \(viewModel.snapshot.alarmRule.formattedBaseTime)")
-                            } label: {
-                                Text("已实时保存")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(.orange)
-                            }
+                            .foregroundStyle(.vibeAccent)
                         }
                     }
                 }
         }
-        .tint(.orange)
+        .tint(.vibeAccent)
         .preferredColorScheme(.light)
     }
 }
@@ -65,17 +51,11 @@ public struct DualThumbTimeDialView: View {
     @State private var newSpecificDate: Date = Date()
 
     private let repeatOptions: [String] = [
-        "法定工作日",
-        "每天响铃",
-        "自定义星期",
-        "指定日期"
+        "Workdays", "Every Day", "Custom", "Dates"
     ]
 
     private let holidayPolicyOptions: [String] = [
-        "节假日跳+补班响",
-        "节假日+请假全跳",
-        "仅跳过法定节假日",
-        "不启用假期跳过"
+        "Skip All", "Holidays", "PTO Only", "Manual"
     ]
 
     public init(viewModel: AppViewModel) {
@@ -85,353 +65,231 @@ public struct DualThumbTimeDialView: View {
     public var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
-                // 1. TOP READOUT CARD (Upper zone: clean digital display + label, no high reach needed)
-                topDigitalReadoutCard
+                topReadoutAndRollersCard
 
-                // 2. MIDDLE ZONE: SKEUOMORPHIC HORIZONTAL ROLLER AXES (横向滚动轴模拟拟物 Dropdown)
-                horizontalRollerDropdownCard
-
-                // Optional inline expansion when Custom Weekdays or Specific Dates is selected on the roller
                 if case .customDays(let selectedDays) = viewModel.snapshot.alarmRule.repeatMode {
                     customWeekdaysBar(selectedDays: selectedDays)
                 } else if case .specificDates(let dates) = viewModel.snapshot.alarmRule.repeatMode {
                     specificDatesBar(dates: dates)
                 }
 
-                // 3. MIDDLE-LOWER ZONE: LEFT & RIGHT SEMI-CIRCULAR SKEUOMORPHIC ROTARY DIALS
-                // Positioned in the middle-to-lower half of the screen where left & right thumbs naturally rotate!
                 semiCircularRotaryDialsCard
             }
             .padding(.horizontal, 14)
             .padding(.top, 8)
             .padding(.bottom, 18)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Color.vibeCanvas)
     }
 
-    // MARK: - 1. Top Digital Readout Card
+    // MARK: - 1. Top Digital Readout & Horizontal Rollers Card
 
-    private var topDigitalReadoutCard: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .center) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 8, height: 8)
-                    TextField("起床闹钟", text: Binding(
-                        get: { viewModel.snapshot.alarmRule.label },
-                        set: { val in viewModel.updateAlarmRule { $0.label = val } }
-                    ))
-                    .font(.subheadline.weight(.semibold))
+    private var topReadoutAndRollersCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("WAKE ALARM")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Toggle("Active", isOn: Binding(
+                    get: { viewModel.snapshot.alarmRule.isEnabled },
+                    set: { val in viewModel.updateAlarmRule { $0.isEnabled = val } }
+                ))
+                .labelsHidden()
+                .tint(.vibeAccent)
+                Text("Active")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(alignment: .center, spacing: 12) {
+                Text(viewModel.snapshot.alarmRule.formattedBaseTime)
+                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .monospacedDigit()
                     .foregroundStyle(.primary)
-                }
 
                 Spacer()
 
-                Text("明日状态: \(viewModel.tomorrowAlarm.status.isRinging ? (viewModel.tomorrowAlarm.effectiveTime ?? viewModel.tomorrowAlarm.baseTime) : "免响铃")")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(viewModel.tomorrowAlarm.status.isRinging ? Color.secondary : Color.orange)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
+                Text("\(repeatShortLabel) · \(holidayShortLabel)")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                     .background(Color(uiColor: .systemGray6))
+                    .foregroundStyle(.secondary)
                     .clipShape(Capsule())
             }
 
-            // Recessed LCD / Ceramic Readout Bezel
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                VStack(spacing: 2) {
-                    Text(String(format: "%02d", viewModel.snapshot.alarmRule.hour))
-                        .font(.system(size: 52, weight: .light, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
-                    Text("左手半圆 · 时 (HOUR)")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
+            VStack(spacing: 10) {
+                SkeuomorphicHorizontalRoller(
+                    title: "REPEAT",
+                    options: repeatOptions,
+                    selectedIndex: repeatModeIndex
+                ) { newIndex in
+                    switch newIndex {
+                    case 0:
+                        viewModel.updateAlarmRule { $0.repeatMode = .weekdays }
+                    case 1:
+                        viewModel.updateAlarmRule { $0.repeatMode = .everyday }
+                    case 2:
+                        viewModel.updateAlarmRule { $0.repeatMode = .customDays(Weekday.standardWeekdays) }
+                    case 3:
+                        let tomorrowStr = viewModel.tomorrowAlarm.date
+                        viewModel.updateAlarmRule { $0.repeatMode = .specificDates([tomorrowStr]) }
+                    default:
+                        break
+                    }
                 }
-                .frame(maxWidth: .infinity)
 
-                Text(":")
-                    .font(.system(size: 44, weight: .light))
-                    .foregroundStyle(.orange)
-                    .offset(y: -10)
-
-                VStack(spacing: 2) {
-                    Text(String(format: "%02d", viewModel.snapshot.alarmRule.minute))
-                        .font(.system(size: 52, weight: .light, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
-                    Text("右手半圆 · 分 (MIN)")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                SkeuomorphicHorizontalRoller(
+                    title: "HOLIDAYS",
+                    options: holidayPolicyOptions,
+                    selectedIndex: holidayPolicyIndex
+                ) { newIndex in
+                    switch newIndex {
+                    case 0:
+                        viewModel.updateAlarmRule {
+                            $0.skipPublicHolidays = true
+                            $0.skipPersonalLeave = true
+                        }
+                    case 1:
+                        viewModel.updateAlarmRule {
+                            $0.skipPublicHolidays = true
+                            $0.skipPersonalLeave = false
+                        }
+                    case 2:
+                        viewModel.updateAlarmRule {
+                            $0.skipPublicHolidays = false
+                            $0.skipPersonalLeave = true
+                        }
+                    case 3:
+                        viewModel.updateAlarmRule {
+                            $0.skipPublicHolidays = false
+                            $0.skipPersonalLeave = false
+                        }
+                    default:
+                        break
+                    }
                 }
-                .frame(maxWidth: .infinity)
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+        }
+        .padding(16)
+        .vibeCard()
+    }
+
+    private var repeatShortLabel: String {
+        repeatOptions[repeatModeIndex]
+    }
+
+    private var holidayShortLabel: String {
+        holidayPolicyOptions[holidayPolicyIndex]
+    }
+
+    // MARK: - 2. Lower Thumb Zone: Semi-Circular Rotary Dials
+
+    private var semiCircularRotaryDialsCard: some View {
+        GeometryReader { geo in
+            let totalW = geo.size.width
+            let totalH = geo.size.height
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [
-                                Color(red: 0.95, green: 0.95, blue: 0.96),
-                                Color(red: 0.99, green: 0.99, blue: 1.0)
-                            ],
+                            colors: [Color.vibeAluminumLight, Color.vibeAluminumDark],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(Color.black.opacity(0.08), lineWidth: 1)
                     )
-            )
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-        )
-    }
 
-    // MARK: - 2. Middle Zone: Skeuomorphic Horizontal Roller Axes (拟物横向滚动轴 Dropdown)
-
-    private var horizontalRollerDropdownCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("周期与假期规则 · 横向拟物滚轴", systemImage: "cylinder.split.1x2")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("左右滑动滚轴切换")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            // Horizontal Roller 1: Repeat Mode
-            SkeuomorphicHorizontalRoller(
-                title: "重复周期",
-                options: repeatOptions,
-                selectedIndex: repeatModeIndex
-            ) { newIndex in
-                switch newIndex {
-                case 0:
-                    viewModel.updateAlarmRule { $0.repeatMode = .weekdays }
-                case 1:
-                    viewModel.updateAlarmRule { $0.repeatMode = .everyday }
-                case 2:
-                    viewModel.updateAlarmRule { $0.repeatMode = .customDays(Weekday.standardWeekdays) }
-                case 3:
-                    let tomorrowStr = viewModel.tomorrowAlarm.date
-                    viewModel.updateAlarmRule { $0.repeatMode = .specificDates([tomorrowStr]) }
-                default:
-                    break
+                // LEFT SEMI-CIRCULAR DIAL (Hour 00-23, anchored on left edge)
+                SemiCircularSkeuomorphicDial(
+                    side: .left,
+                    value: viewModel.snapshot.alarmRule.hour,
+                    modulo: 24,
+                    tickCount: 72,
+                    unitTitle: "HOUR"
+                ) { newHour in
+                    viewModel.updateAlarmTime(
+                        hour: newHour,
+                        minute: viewModel.snapshot.alarmRule.minute
+                    )
                 }
-            }
+                .frame(width: totalW * 0.44, height: totalH)
+                .position(x: totalW * 0.22, y: totalH / 2)
 
-            // Horizontal Roller 2: Smart Holiday & Makeup Workday Policy
-            SkeuomorphicHorizontalRoller(
-                title: "假期策略",
-                options: holidayPolicyOptions,
-                selectedIndex: holidayPolicyIndex
-            ) { newIndex in
-                switch newIndex {
-                case 0:
-                    viewModel.updateAlarmRule {
-                        $0.skipPublicHolidays = true
-                        $0.skipPersonalLeave = false
-                    }
-                case 1:
-                    viewModel.updateAlarmRule {
-                        $0.skipPublicHolidays = true
-                        $0.skipPersonalLeave = true
-                    }
-                case 2:
-                    viewModel.updateAlarmRule {
-                        $0.skipPublicHolidays = true
-                        $0.skipPersonalLeave = false
-                    }
-                case 3:
-                    viewModel.updateAlarmRule {
-                        $0.skipPublicHolidays = false
-                        $0.skipPersonalLeave = false
-                    }
-                default:
-                    break
+                // RIGHT SEMI-CIRCULAR DIAL (Minute 00-59, anchored on right edge)
+                SemiCircularSkeuomorphicDial(
+                    side: .right,
+                    value: viewModel.snapshot.alarmRule.minute,
+                    modulo: 60,
+                    tickCount: 60,
+                    unitTitle: "MIN"
+                ) { newMinute in
+                    viewModel.updateAlarmTime(
+                        hour: viewModel.snapshot.alarmRule.hour,
+                        minute: newMinute
+                    )
                 }
-            }
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-        )
-    }
+                .frame(width: totalW * 0.44, height: totalH)
+                .position(x: totalW * 0.78, y: totalH / 2)
 
-    // MARK: - 3. Middle-Lower Zone: Left & Right Semi-Circular Skeuomorphic Rotary Dials
-
-    private var semiCircularRotaryDialsCard: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Label("左右半圆拟物转盘 (屏幕中下部双手拇指区)", systemImage: "dial.medium.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("上下拨动转盘边缘")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            }
-            .padding(.horizontal, 4)
-
-            GeometryReader { geo in
-                let totalW = geo.size.width
-                let totalH = geo.size.height
-
-                ZStack {
-                    // Subtle machined recessed chassis plate
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.94, green: 0.94, blue: 0.96),
-                                    Color(red: 0.90, green: 0.90, blue: 0.93)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(Color.black.opacity(0.10), lineWidth: 1)
-                        )
-
-                    // LEFT SEMI-CIRCULAR ROTARY DIAL (Hour 00-23, anchored on left edge)
-                    SemiCircularSkeuomorphicDial(
-                        side: .left,
-                        value: viewModel.snapshot.alarmRule.hour,
-                        modulo: 24,
-                        unitTitle: "时",
-                        subtitle: "左手旋时"
-                    ) { newHour in
-                        viewModel.updateAlarmTime(
-                            hour: newHour,
-                            minute: viewModel.snapshot.alarmRule.minute
-                        )
-                    }
-                    .frame(width: totalW * 0.44, height: totalH)
-                    .position(x: totalW * 0.22, y: totalH / 2)
-
-                    // RIGHT SEMI-CIRCULAR ROTARY DIAL (Minute 00-59, anchored on right edge)
-                    SemiCircularSkeuomorphicDial(
-                        side: .right,
-                        value: viewModel.snapshot.alarmRule.minute,
-                        modulo: 60,
-                        unitTitle: "分",
-                        subtitle: "右手旋分"
-                    ) { newMinute in
-                        viewModel.updateAlarmTime(
-                            hour: viewModel.snapshot.alarmRule.hour,
-                            minute: newMinute
-                        )
-                    }
-                    .frame(width: totalW * 0.44, height: totalH)
-                    .position(x: totalW * 0.78, y: totalH / 2)
-
-                    // CENTER MECHANICAL SPINE: Dual Pointer Needles + Quick Minute Detents
-                    VStack(spacing: 10) {
-                        Text("拇指刻度盘")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-
-                        // Center Dual Index Pointer Bridge pointing left (Hour) and right (Minute)
-                        HStack(spacing: 4) {
-                            HStack(spacing: 2) {
-                                Image(systemName: "arrowtriangle.left.fill")
-                                    .font(.system(size: 9))
-                                Text("时")
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 4)
-                            .background(Color.orange)
-                            .clipShape(Capsule())
-
-                            HStack(spacing: 2) {
-                                Text("分")
-                                    .font(.system(size: 11, weight: .bold))
-                                Image(systemName: "arrowtriangle.right.fill")
-                                    .font(.system(size: 9))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 4)
-                            .background(Color.orange)
-                            .clipShape(Capsule())
-                        }
-                        .shadow(color: Color.orange.opacity(0.3), radius: 3, x: 0, y: 1)
-
-                        // Quick tactile minute preset buttons in the center column
-                        VStack(spacing: 6) {
-                            ForEach([0, 15, 30, 45], id: \.self) { presetMin in
-                                let isCurrent = viewModel.snapshot.alarmRule.minute == presetMin
-                                Button {
-                                    let gen = UIImpactFeedbackGenerator(style: .light)
-                                    gen.impactOccurred()
-                                    viewModel.updateAlarmTime(
-                                        hour: viewModel.snapshot.alarmRule.hour,
-                                        minute: presetMin
-                                    )
-                                } label: {
-                                    Text(String(format: ":%02d", presetMin))
-                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                        .monospacedDigit()
-                                        .frame(width: 54, height: 26)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                                .fill(isCurrent ? Color.orange : Color.white)
-                                                .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
-                                        )
-                                        .foregroundStyle(isCurrent ? Color.white : Color.primary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-
+                // CENTER QUICK-SNAP COLUMN
+                VStack(spacing: 8) {
+                    ForEach([0, 15, 30, 45], id: \.self) { presetMin in
+                        let isCurrent = viewModel.snapshot.alarmRule.minute == presetMin
                         Button {
-                            let gen = UIImpactFeedbackGenerator(style: .rigid)
+                            let gen = UIImpactFeedbackGenerator(style: .light)
                             gen.impactOccurred()
-                            let nextMin = (viewModel.snapshot.alarmRule.minute + 5) % 60
                             viewModel.updateAlarmTime(
                                 hour: viewModel.snapshot.alarmRule.hour,
-                                minute: nextMin
+                                minute: presetMin
                             )
                         } label: {
-                            Text("+5m")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.orange)
-                                .frame(width: 54, height: 24)
+                            Text(String(format: ":%02d", presetMin))
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .frame(width: 52, height: 26)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .fill(Color.white.opacity(0.9))
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .fill(isCurrent ? Color.vibeAccent : Color.white)
+                                        .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
                                 )
+                                .foregroundStyle(isCurrent ? Color.white : Color.primary)
                         }
                         .buttonStyle(.plain)
                     }
-                    .frame(width: totalW * 0.22)
-                    .position(x: totalW * 0.5, y: totalH / 2)
+
+                    Button {
+                        let gen = UIImpactFeedbackGenerator(style: .rigid)
+                        gen.impactOccurred()
+                        let nextMin = (viewModel.snapshot.alarmRule.minute + 5) % 60
+                        viewModel.updateAlarmTime(
+                            hour: viewModel.snapshot.alarmRule.hour,
+                            minute: nextMin
+                        )
+                    } label: {
+                        Text("+5m")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.vibeAccent)
+                            .frame(width: 52, height: 24)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.white.opacity(0.9))
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .frame(width: totalW * 0.22)
+                .position(x: totalW * 0.5, y: totalH / 2)
             }
-            .frame(height: 292)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 3)
-        )
+        .frame(height: 290)
     }
 
     // MARK: - Optional Aux Bars for Custom Weekdays / Specific Dates
@@ -449,7 +307,7 @@ public struct DualThumbTimeDialView: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(active ? Color.orange : Color(uiColor: .systemGray6))
+                        .background(active ? Color.vibeAccent : Color(uiColor: .systemGray6))
                         .foregroundStyle(active ? Color.white : Color.primary)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
@@ -457,26 +315,26 @@ public struct DualThumbTimeDialView: View {
             }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+        .vibeCard()
     }
 
     private func specificDatesBar(dates: Set<String>) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                DatePicker("选择特定日期", selection: $newSpecificDate, displayedComponents: .date)
-                    .font(.subheadline)
-                Button("添加日期") {
-                    let dStr = AlarmScheduleEngine().dateString(from: newSpecificDate)
-                    var next = dates
-                    next.insert(dStr)
-                    viewModel.updateAlarmRule { $0.repeatMode = .specificDates(next) }
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.orange)
+        HStack {
+            DatePicker("Pick a Date", selection: $newSpecificDate, displayedComponents: .date)
+                .font(.subheadline)
+                .labelsHidden()
+            Spacer()
+            Button("Add Date") {
+                let dStr = AlarmScheduleEngine().dateString(from: newSpecificDate)
+                var next = dates
+                next.insert(dStr)
+                viewModel.updateAlarmRule { $0.repeatMode = .specificDates(next) }
             }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.vibeAccent)
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+        .vibeCard()
     }
 
     private var repeatModeIndex: Int {
@@ -491,16 +349,18 @@ public struct DualThumbTimeDialView: View {
     private var holidayPolicyIndex: Int {
         let rule = viewModel.snapshot.alarmRule
         if rule.skipPublicHolidays && rule.skipPersonalLeave {
-            return 1
-        } else if rule.skipPublicHolidays && !rule.skipPersonalLeave {
             return 0
+        } else if rule.skipPublicHolidays && !rule.skipPersonalLeave {
+            return 1
+        } else if !rule.skipPublicHolidays && rule.skipPersonalLeave {
+            return 2
         } else {
             return 3
         }
     }
 }
 
-// MARK: - Skeuomorphic Horizontal Roller Axis (横向滚动轴模拟拟物 Dropdown)
+// MARK: - Skeuomorphic Horizontal Roller Axis
 
 public struct SkeuomorphicHorizontalRoller: View {
     public let title: String
@@ -525,92 +385,43 @@ public struct SkeuomorphicHorizontalRoller: View {
 
     public var body: some View {
         HStack(spacing: 8) {
-            // Left title label
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
                 .foregroundStyle(.secondary)
-                .frame(width: 54, alignment: .leading)
+                .frame(width: 56, alignment: .leading)
 
-            // Recessed Mechanical Horizontal Cylinder Slot
             GeometryReader { geo in
                 let w = geo.size.width
                 let h = geo.size.height
 
                 ZStack {
-                    // 1. Metallic/ivory horizontal barrel base with vertical knurled ridges
+                    // Machined aluminum barrel with vertical knurled groove ticks
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [
-                                    Color(red: 0.86, green: 0.86, blue: 0.89),
-                                    Color(red: 0.98, green: 0.98, blue: 0.99),
-                                    Color(red: 0.99, green: 0.99, blue: 1.0),
-                                    Color(red: 0.85, green: 0.85, blue: 0.88)
-                                ],
+                                colors: [Color.vibeAluminumDark, Color.vibeAluminumLight, Color.vibeAluminumLight, Color.vibeAluminumDark],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
 
-                    // 2. Fine vertical mechanical knurling lines across the horizontal roller
                     HStack(spacing: 6) {
                         ForEach(0..<36, id: \.self) { _ in
                             Rectangle()
-                                .fill(Color.black.opacity(0.045))
-                                .frame(width: 1, height: h - 6)
+                                .fill(Color.black.opacity(0.05))
+                                .frame(width: 1, height: h - 8)
                         }
                     }
 
-                    // 3. 3D Horizontally Rotated Option Labels (-1, 0, +1 along the horizontal axis)
-                    ZStack {
-                        ForEach([-1, 0, 1], id: \.self) { delta in
-                            let idx = wrappedIndex(selectedIndex + delta)
-                            let isCenter = delta == 0
-                            let xOffset = CGFloat(delta) * (w * 0.35) + dragVisualOffset * 0.25
-
-                            Text(options[idx])
-                                .font(.system(size: isCenter ? 13 : 11, weight: isCenter ? .bold : .medium))
-                                .foregroundStyle(
-                                    isCenter
-                                        ? Color(red: 0.10, green: 0.10, blue: 0.12)
-                                        : Color.secondary.opacity(0.65)
-                                )
-                                .lineLimit(1)
-                                .rotation3DEffect(
-                                    .degrees(Double(delta) * -32),
-                                    axis: (x: 0, y: 1, z: 0),
-                                    perspective: 0.45
-                                )
-                                .scaleEffect(isCenter ? 1.0 : 0.86)
-                                .offset(x: xOffset)
-                                .onTapGesture {
-                                    guard delta != 0 else { return }
-                                    emitRollerTick(idx)
-                                }
-                        }
+                    // Prev / Current / Next option row — current highlighted in a white capsule
+                    HStack(spacing: 10) {
+                        optionLabel(delta: -1, w: w)
+                        currentOptionCapsule
+                        optionLabel(delta: 1, w: w)
                     }
+                    .offset(x: dragVisualOffset * 0.2)
 
-                    // 4. Center Magnification Window & Top/Bottom Orange Index Pointers
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .stroke(Color.orange.opacity(0.75), lineWidth: 1.2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(Color.white.opacity(0.55))
-                        )
-                        .frame(width: w * 0.44, height: h - 6)
-
-                    VStack {
-                        Image(systemName: "arrowtriangle.down.fill")
-                            .font(.system(size: 7))
-                            .foregroundStyle(.orange)
-                        Spacer()
-                        Image(systemName: "arrowtriangle.up.fill")
-                            .font(.system(size: 7))
-                            .foregroundStyle(.orange)
-                    }
-                    .padding(.vertical, 1)
-
-                    // 5. Left & Right Cylindrical Edge Shadow Overlay + Step Chevrons
                     HStack {
                         Button {
                             emitRollerTick(wrappedIndex(selectedIndex - 1))
@@ -635,9 +446,8 @@ public struct SkeuomorphicHorizontalRoller: View {
                         .buttonStyle(.plain)
                     }
 
-                    // Recessed inner border
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.black.opacity(0.16), lineWidth: 1)
+                        .stroke(Color.black.opacity(0.14), lineWidth: 1)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .contentShape(Rectangle())
@@ -648,7 +458,7 @@ public struct SkeuomorphicHorizontalRoller: View {
                                 dragStartIndex = selectedIndex
                             }
                             let base = dragStartIndex ?? selectedIndex
-                            let stepWidth: CGFloat = 52
+                            let stepWidth: CGFloat = 60
                             let steps = Int((-gesture.translation.width / stepWidth).rounded())
                             let candidate = wrappedIndex(base + steps)
                             dragVisualOffset = gesture.translation.width.truncatingRemainder(dividingBy: stepWidth)
@@ -664,8 +474,39 @@ public struct SkeuomorphicHorizontalRoller: View {
                         }
                 )
             }
-            .frame(height: 38)
+            .frame(height: 36)
         }
+    }
+
+    private var currentOptionCapsule: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(Color.vibeAccent)
+                .frame(width: 5, height: 5)
+            Text(options[selectedIndex])
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.vibeInk)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.12), radius: 2, x: 0, y: 1)
+        )
+    }
+
+    private func optionLabel(delta: Int, w: CGFloat) -> some View {
+        let idx = wrappedIndex(selectedIndex + delta)
+        return Text(options[idx])
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Color.secondary.opacity(0.6))
+            .lineLimit(1)
+            .frame(width: w * 0.22)
+            .onTapGesture {
+                emitRollerTick(idx)
+            }
     }
 
     private func wrappedIndex(_ raw: Int) -> Int {
@@ -680,7 +521,7 @@ public struct SkeuomorphicHorizontalRoller: View {
     }
 }
 
-// MARK: - Semi-Circular Skeuomorphic Rotary Dial (左右半个转盘拟物形式旋转)
+// MARK: - Semi-Circular Skeuomorphic Rotary Dial
 
 public enum SemiCircularDialSide {
     case left
@@ -691,8 +532,8 @@ public struct SemiCircularSkeuomorphicDial: View {
     public let side: SemiCircularDialSide
     public let value: Int
     public let modulo: Int
+    public let tickCount: Int
     public let unitTitle: String
-    public let subtitle: String
     public let onChange: (Int) -> Void
 
     @State private var dragStartValue: Int?
@@ -702,15 +543,15 @@ public struct SemiCircularSkeuomorphicDial: View {
         side: SemiCircularDialSide,
         value: Int,
         modulo: Int,
+        tickCount: Int,
         unitTitle: String,
-        subtitle: String,
         onChange: @escaping (Int) -> Void
     ) {
         self.side = side
         self.value = value
         self.modulo = modulo
+        self.tickCount = tickCount
         self.unitTitle = unitTitle
-        self.subtitle = subtitle
         self.onChange = onChange
     }
 
@@ -719,14 +560,14 @@ public struct SemiCircularSkeuomorphicDial: View {
             let w = geo.size.width
             let h = geo.size.height
             let radius = min(w * 0.96, h * 0.48)
-            // Anchor the wheel center on the outer left or outer right edge so the semi-circle protrudes inward!
+            // Anchor the wheel center just outside the screen edge so its semi-circle protrudes inward.
             let center = CGPoint(
-                x: side == .left ? -8 : w + 8,
+                x: side == .left ? -radius * 0.06 : w + radius * 0.06,
                 y: h / 2
             )
+            let baseAngleDeg: Double = side == .left ? 0.0 : 180.0
 
             ZStack {
-                // 1. Machined Skeuomorphic Wheel Disc & Ticks via SwiftUI Canvas
                 Canvas { context, _ in
                     let wheelRect = CGRect(
                         x: center.x - radius,
@@ -736,16 +577,13 @@ public struct SemiCircularSkeuomorphicDial: View {
                     )
                     let wheelPath = Path(ellipseIn: wheelRect)
 
-                    // Outer drop shadow
                     context.drawLayer { shadowCtx in
                         shadowCtx.addFilter(.shadow(color: .black.opacity(0.16), radius: 8, x: side == .left ? 3 : -3, y: 2))
-                        shadowCtx.fill(wheelPath, with: .color(Color(red: 0.97, green: 0.97, blue: 0.98)))
+                        shadowCtx.fill(wheelPath, with: .color(Color.vibeAluminumLight))
                     }
 
-                    // Outer metallic/ceramic rim stroke
                     context.stroke(wheelPath, with: .color(Color.black.opacity(0.18)), lineWidth: 1.5)
 
-                    // Concentric machined rings
                     for factor in [0.92, 0.82, 0.56, 0.34] as [CGFloat] {
                         let r = radius * factor
                         let ringRect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
@@ -757,23 +595,20 @@ public struct SemiCircularSkeuomorphicDial: View {
                     }
 
                     // Knurled outer teeth & radial graduation ticks
-                    let totalTeeth = 60
                     let fractionalShift = Double(dragVisualFraction) * 6.0
-                    for i in 0..<totalTeeth {
-                        let deg = Double(i) * (360.0 / Double(totalTeeth)) + fractionalShift
+                    for i in 0..<tickCount {
+                        let deg = Double(i) * (360.0 / Double(tickCount)) + fractionalShift
                         let rad = deg * .pi / 180.0
                         let cosA = CGFloat(cos(rad))
                         let sinA = CGFloat(sin(rad))
 
-                        // Outer knurled serration tooth
                         let pOuter1 = CGPoint(x: center.x + cosA * (radius * 0.94), y: center.y + sinA * (radius * 0.94))
                         let pOuter2 = CGPoint(x: center.x + cosA * (radius * 0.99), y: center.y + sinA * (radius * 0.99))
                         var tooth = Path()
                         tooth.move(to: pOuter1)
                         tooth.addLine(to: pOuter2)
-                        context.stroke(tooth, with: .color(Color.black.opacity(0.22)), lineWidth: 1.2)
+                        context.stroke(tooth, with: .color(Color.vibeInk.opacity(0.22)), lineWidth: 1.0)
 
-                        // Inner graduation tick on track
                         let isMajor = i % 5 == 0
                         let innerR = radius * (isMajor ? 0.83 : 0.86)
                         let outerR = radius * 0.91
@@ -784,26 +619,40 @@ public struct SemiCircularSkeuomorphicDial: View {
                         tick.addLine(to: p2)
                         context.stroke(
                             tick,
-                            with: .color(isMajor ? Color.orange.opacity(0.85) : Color.black.opacity(0.20)),
-                            lineWidth: isMajor ? 1.8 : 0.9
+                            with: .color(isMajor ? Color.vibeInkMuted : Color.black.opacity(0.18)),
+                            lineWidth: isMajor ? 1.5 : 0.8
                         )
                     }
 
+                    // Sharp Braun Orange horizontal index needle pointing to the active value
+                    let needleInnerR = radius * 0.30
+                    let needleOuterR = radius * 0.80
+                    let needleRad = baseAngleDeg * .pi / 180.0
+                    let nCos = CGFloat(cos(needleRad))
+                    let nSin = CGFloat(sin(needleRad))
+                    var needle = Path()
+                    needle.move(to: CGPoint(x: center.x + nCos * needleInnerR, y: center.y + nSin * needleInnerR))
+                    needle.addLine(to: CGPoint(x: center.x + nCos * needleOuterR, y: center.y + nSin * needleOuterR))
+                    context.stroke(needle, with: .color(Color.vibeAccent), lineWidth: 2.5)
+                    let tipRect = CGRect(
+                        x: center.x + nCos * needleOuterR - 3,
+                        y: center.y + nSin * needleOuterR - 3,
+                        width: 6, height: 6
+                    )
+                    context.fill(Path(ellipseIn: tipRect), with: .color(Color.vibeAccent))
+
                     // Center recessed hub cap
-                    let hubR = radius * 0.34
+                    let hubR = radius * 0.30
                     let hubRect = CGRect(x: center.x - hubR, y: center.y - hubR, width: hubR * 2, height: hubR * 2)
-                    context.fill(Path(ellipseIn: hubRect), with: .color(Color(red: 0.91, green: 0.91, blue: 0.94)))
+                    context.fill(Path(ellipseIn: hubRect), with: .color(Color.vibeAluminumDark))
                     context.stroke(Path(ellipseIn: hubRect), with: .color(Color.black.opacity(0.15)), lineWidth: 1)
                 }
 
-                // 2. Radial Rotating Numbers along the Semi-Circular Arc (-3, -2, -1, 0, +1, +2, +3)
+                // Upright rotating numerals along the inner arc (-3...+3 from the active value)
                 ForEach([-3, -2, -1, 0, 1, 2, 3], id: \.self) { delta in
                     let slotValue = wrapped(value + delta)
                     let isSelected = delta == 0
                     let stepAngleDeg: Double = 23.0
-                    let baseAngleDeg: Double = side == .left ? 0.0 : 180.0
-                    // For left wheel (0° pointing right), +delta goes downward (+deg);
-                    // For right wheel (180° pointing left), +delta also goes downward (-deg in standard polar).
                     let angleDeg: Double = side == .left
                         ? (baseAngleDeg + Double(delta) * stepAngleDeg)
                         : (baseAngleDeg - Double(delta) * stepAngleDeg)
@@ -815,29 +664,15 @@ public struct SemiCircularSkeuomorphicDial: View {
 
                     Text(String(format: "%02d", slotValue))
                         .font(.system(
-                            size: isSelected ? 21 : 15,
+                            size: isSelected ? 20 : 14,
                             weight: isSelected ? .bold : .medium,
                             design: .rounded
                         ))
                         .monospacedDigit()
                         .foregroundStyle(
                             isSelected
-                                ? Color.orange
-                                : Color(red: 0.22, green: 0.22, blue: 0.25).opacity(max(0.28, 0.85 - Double(abs(delta)) * 0.18))
-                        )
-                        .padding(.horizontal, isSelected ? 6 : 0)
-                        .padding(.vertical, isSelected ? 2 : 0)
-                        .background(
-                            Group {
-                                if isSelected {
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .fill(Color.orange.opacity(0.14))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                                .stroke(Color.orange, lineWidth: 1.2)
-                                        )
-                                }
-                            }
+                                ? Color.vibeAccent
+                                : Color.vibeInk.opacity(max(0.26, 0.82 - Double(abs(delta)) * 0.18))
                         )
                         .position(x: xPos, y: yPos)
                         .onTapGesture {
@@ -846,20 +681,15 @@ public struct SemiCircularSkeuomorphicDial: View {
                         }
                 }
 
-                // 3. Inner Hub Label near the screen edge
+                // Inner hub label near the screen edge
                 VStack(spacing: 2) {
-                    Image(systemName: side == .left ? "arrow.up.and.down.circle.fill" : "arrow.up.and.down.circle.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.orange)
                     Text(unitTitle)
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.5)
                         .foregroundStyle(.primary)
-                    Text(subtitle)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
                 }
                 .position(
-                    x: side == .left ? radius * 0.23 : w - radius * 0.23,
+                    x: side == .left ? radius * 0.20 : w - radius * 0.20,
                     y: h / 2
                 )
             }

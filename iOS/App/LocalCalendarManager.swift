@@ -16,15 +16,15 @@ public struct LocalCalendarSourceInfo: Identifiable, Equatable, Sendable {
     }
 
     public static let samplePreviewCalendars: [LocalCalendarSourceInfo] = [
-        LocalCalendarSourceInfo(id: "cal-icloud-work", title: "工作日历 (Work)", sourceTitle: "iCloud", colorHex: "#007AFF"),
-        LocalCalendarSourceInfo(id: "cal-icloud-personal", title: "个人与休假 (Personal)", sourceTitle: "iCloud", colorHex: "#34C759"),
-        LocalCalendarSourceInfo(id: "cal-exchange-corp", title: "公司考勤与请假 (OA)", sourceTitle: "Exchange", colorHex: "#FF9500"),
-        LocalCalendarSourceInfo(id: "cal-local-birthdays", title: "生日与纪念日", sourceTitle: "iOS 系统内置", colorHex: "#AF52DE")
+        LocalCalendarSourceInfo(id: "cal-icloud-work", title: "Work", sourceTitle: "iCloud", colorHex: "#007AFF"),
+        LocalCalendarSourceInfo(id: "cal-icloud-personal", title: "Personal", sourceTitle: "iCloud", colorHex: "#34C759"),
+        LocalCalendarSourceInfo(id: "cal-exchange-corp", title: "Team PTO", sourceTitle: "Exchange", colorHex: "#FF9500"),
+        LocalCalendarSourceInfo(id: "cal-local-birthdays", title: "Birthdays", sourceTitle: "iOS Built-in", colorHex: "#AF52DE")
     ]
 }
 
 /// Reads the user's local iPhone calendars via `EventKit` strictly on-device
-/// to identify personal leave (`请假 / 年假 / PTO / Vacation / 调休`) for the upcoming 30 days.
+/// to identify personal leave (PTO / Vacation / Annual Leave) for the upcoming 30 days.
 @MainActor
 public final class LocalCalendarManager: ObservableObject {
     private let eventStore = EKEventStore()
@@ -62,15 +62,15 @@ public final class LocalCalendarManager: ObservableObject {
 
     public var statusDisplayText: String {
         if hasReadAccess {
-            return "已授权只读访问 (本地扫描)"
+            return "Authorized · On-Device Only"
         }
         switch authorizationStatus {
         case .notDetermined:
-            return "待授权 (点击开启只读访问)"
+            return "Not Authorized (Tap to Enable)"
         case .denied, .restricted:
-            return "未开启 (前往系统设置开启)"
+            return "Disabled (Enable in Settings)"
         default:
-            return "已授权只读访问"
+            return "Authorized · Read-Only"
         }
     }
 
@@ -100,7 +100,7 @@ public final class LocalCalendarManager: ObservableObject {
             LocalCalendarSourceInfo(
                 id: $0.calendarIdentifier,
                 title: $0.title,
-                sourceTitle: $0.source?.title ?? "本地日历"
+                sourceTitle: $0.source?.title ?? "Local Calendar"
             )
         }
         .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -155,7 +155,7 @@ public final class LocalCalendarManager: ObservableObject {
                 detected.append(
                     HolidayCalendarEntry(
                         date: dStr,
-                        title: title.isEmpty ? "日历休假" : title,
+                        title: title.isEmpty ? "Calendar Leave" : title,
                         kind: finalKind,
                         source: .localEventKit
                     )

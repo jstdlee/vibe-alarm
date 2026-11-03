@@ -54,31 +54,31 @@ public final class AppViewModel: ObservableObject {
         entries.append(contentsOf: [
             HolidayCalendarEntry(
                 date: "2026-11-08",
-                title: "周末调休补班",
+                title: "Weekend Makeup Workday",
                 kind: .makeupWorkday,
                 source: .externalICS
             ),
             HolidayCalendarEntry(
                 date: "2026-11-11",
-                title: "个人年假 · 家庭出行",
+                title: "Annual Leave · Family Trip",
                 kind: .personalLeave,
                 source: .localEventKit
             ),
             HolidayCalendarEntry(
                 date: "2026-11-12",
-                title: "个人年假 · 家庭出行",
+                title: "Annual Leave · Family Trip",
                 kind: .personalLeave,
                 source: .localEventKit
             ),
             HolidayCalendarEntry(
                 date: "2026-11-21",
-                title: "季度发布周六值班",
+                title: "Quarterly Release Saturday Duty",
                 kind: .makeupWorkday,
                 source: .builtin
             ),
             HolidayCalendarEntry(
                 date: "2026-11-27",
-                title: "公司福利公休假",
+                title: "Company Perk Holiday",
                 kind: .publicHoliday,
                 source: .byokLLM
             )
@@ -93,7 +93,7 @@ public final class AppViewModel: ObservableObject {
 
         let demoSnapshot = VibeAlarmSnapshot(
             alarmRule: AlarmRule(
-                label: "起床闹钟",
+                label: "Wake Alarm",
                 hour: 7,
                 minute: 30,
                 isEnabled: true,
@@ -194,7 +194,7 @@ public final class AppViewModel: ObservableObject {
         if !localCalendarManager.hasReadAccess {
             let granted = await localCalendarManager.requestAccess()
             if !granted {
-                showBanner("未获得系统日历读取权限")
+                showBanner("Calendar read access was not granted")
                 return
             }
         }
@@ -205,10 +205,10 @@ public final class AppViewModel: ObservableObject {
         if !leaveEntries.isEmpty,
            let updated = try? store.upsertHolidayEntries(leaveEntries, replacingSource: .localEventKit) {
             applySnapshot(updated, persist: false)
-            showBanner("已同步 \(leaveEntries.count) 条 iOS 系统日历请假日程")
+            showBanner("Synced \(leaveEntries.count) leave entries from the iOS calendar")
         } else {
             let existingCount = snapshot.holidayEntries.filter { $0.source == .localEventKit }.count
-            showBanner("已扫描 iOS 系统日历 (当前匹配 \(existingCount) 条休假)")
+            showBanner("Scanned the iOS calendar (currently matching \(existingCount) leave entries)")
         }
     }
 
@@ -249,7 +249,7 @@ public final class AppViewModel: ObservableObject {
         }
         applySnapshot(copy)
         if successCount > 0 {
-            showBanner("已更新 \(successCount) 个外部订阅日历")
+            showBanner("Updated \(successCount) external calendar subscription(s)")
         }
     }
 
@@ -267,7 +267,7 @@ public final class AppViewModel: ObservableObject {
             if !copy.subscriptions.contains(where: { $0.url.caseInsensitiveCompare(url) == .orderedSame }) {
                 copy.subscriptions.append(
                     ExternalCalendarSubscription(
-                        name: "日历订阅",
+                        name: "Calendar Subscription",
                         url: url,
                         regionHint: .custom,
                         isEnabled: true
@@ -332,6 +332,31 @@ public final class AppViewModel: ObservableObject {
         applySnapshot(copy)
     }
 
+    // MARK: - Leave Keyword Management
+
+    public func addLeaveKeyword(_ keyword: String) {
+        let trimmed = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var copy = snapshot
+        guard !copy.leaveKeywords.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) else { return }
+        copy.leaveKeywords.append(trimmed)
+        applySnapshot(copy)
+    }
+
+    public func removeLeaveKeyword(_ keyword: String) {
+        var copy = snapshot
+        copy.leaveKeywords.removeAll { $0 == keyword }
+        applySnapshot(copy)
+    }
+
+    // MARK: - BYOK Configuration
+
+    public func updateBYOKConfig(_ config: BYOKConfiguration) {
+        var copy = snapshot
+        copy.byokConfig = config
+        applySnapshot(copy, persist: true)
+    }
+
     // MARK: - Notification Permission & Test Trigger
 
     public func requestNotificationPermissionIfNeeded() async {
@@ -345,13 +370,13 @@ public final class AppViewModel: ObservableObject {
         await requestNotificationPermissionIfNeeded()
         let content = UNMutableNotificationContent()
         if let eff = tomorrowAlarm.effectiveTime, tomorrowAlarm.status.isRinging {
-            content.title = "明日闹钟确认 · \(eff)"
-            content.subtitle = "明天 (\(tomorrowAlarm.weekdayText)) · \(tomorrowAlarm.reasonBadge)"
-            content.body = "长按此通知可选择「跳过明日闹钟」或「推迟 30 分钟」，后天自动恢复。"
+            content.title = "Tomorrow's Alarm Confirmed · \(eff)"
+            content.subtitle = "Tomorrow (\(tomorrowAlarm.weekdayText)) · \(tomorrowAlarm.reasonBadge)"
+            content.body = "Long-press this notification to Skip Tomorrow or Delay 30 Minutes. Restores automatically the day after."
         } else {
-            content.title = "明日免响铃 · \(tomorrowAlarm.reasonBadge)"
-            content.subtitle = "明天 (\(tomorrowAlarm.weekdayText)) 原定 \(tomorrowAlarm.baseTime)"
-            content.body = "长按此通知可选择「恢复响铃」或「推迟 30 分钟」。"
+            content.title = "No Alarm Tomorrow · \(tomorrowAlarm.reasonBadge)"
+            content.subtitle = "Tomorrow (\(tomorrowAlarm.weekdayText)) was \(tomorrowAlarm.baseTime)"
+            content.body = "Long-press this notification to Restore Ringing or Delay 30 Minutes."
         }
         content.sound = .default
         content.categoryIdentifier = AppConstants.bedtimeCategoryIdentifier

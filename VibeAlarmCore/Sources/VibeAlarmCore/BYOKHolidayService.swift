@@ -9,7 +9,7 @@ public enum BYOKProviderKind: String, Codable, CaseIterable, Sendable {
     public var displayName: String {
         switch self {
         case .openAICompatible:
-            return "OpenAI 兼容 (OpenAI / DeepSeek / OpenRouter / Ollama)"
+            return "OpenAI Compatible (OpenAI / DeepSeek / OpenRouter / Ollama)"
         case .anthropic:
             return "Anthropic Claude (/v1/messages)"
         }
@@ -76,15 +76,15 @@ public enum BYOKServiceError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "尚未配置 API Key（可在设置页填入 Keychain，或直接使用本地规则解析）。"
+            return "No API key configured yet (set one in Settings, or use the on-device offline parser)."
         case .invalidEndpointURL:
-            return "API Endpoint URL 格式无效。"
+            return "The API endpoint URL is not valid."
         case .httpError(let code, let msg):
-            return "LLM 接口返回 HTTP \(code): \(msg)"
+            return "The LLM endpoint returned HTTP \(code): \(msg)"
         case .emptyModelResponse:
-            return "LLM 返回内容为空。"
+            return "The LLM response was empty."
         case .malformedJSON(let detail):
-            return "无法解析 LLM 返回的假期 JSON: \(detail)"
+            return "Could not parse the holiday JSON returned by the LLM: \(detail)"
         }
     }
 }
@@ -100,24 +100,24 @@ public struct BYOKHolidayService: Sendable {
 
     public static func systemPrompt(referenceDateString: String) -> String {
         """
-        你是一个运行在用户 iPhone 本地的智能假期与调休提取助手。当前参考日期是 \(referenceDateString)。
-        请从用户粘贴的邮件、HR通知、政府放假公告或口语指令中提取所有涉及的日期条目，以及文中出现的任何日历订阅链接(.ics/webcal)。
-        严格且仅输出如下 JSON 对象（不要输出任何额外解释）：
+        You are a holiday and makeup-workday extraction assistant running entirely on the user's iPhone. The current reference date is \(referenceDateString).
+        Extract every date mentioned in the pasted email, HR notice, government holiday announcement, or spoken instruction, along with any calendar subscription links (.ics/webcal) found in the text.
+        Respond with ONLY the following JSON object (no extra commentary):
         {
           "entries": [
             {
               "date": "YYYY-MM-DD",
-              "title": "简短名称，如 国庆节 / 年假 / 春节调休补班",
+              "title": "Short name, e.g. National Day / Annual Leave / Makeup Workday",
               "kind": "publicHoliday | makeupWorkday | personalLeave"
             }
           ],
           "discoveredCalendarURLs": ["https://example.com/holidays.ics"],
-          "summaryNote": "一句话总结提取结果"
+          "summaryNote": "One-sentence summary of what was extracted"
         }
-        规则：
-        1. 如果是一段连续日期（例如 2026年10月26日至10月28日请年假），请展开成每一天独立的 YYYY-MM-DD 条目。
-        2. 法定节假日或公共放假用 "publicHoliday"；周末调休上班/补班用 "makeupWorkday"；个人请假/年假/病假/休假用 "personalLeave"。
-        3. 如果文中包含 webcal:// 或 .ics 链接，将其放入 discoveredCalendarURLs（webcal:// 自动替换为 https://）。
+        Rules:
+        1. If a continuous date range is mentioned (e.g. "October 26 to October 28, 2026 annual leave"), expand it into one entry per day.
+        2. Statutory public holidays use "publicHoliday"; a weekend makeup workday use "makeupWorkday"; personal leave, annual leave, or sick leave use "personalLeave".
+        3. If the text contains a webcal:// or .ics link, include it in discoveredCalendarURLs (replace webcal:// with https://).
         """
     }
 
@@ -244,14 +244,14 @@ public struct BYOKHolidayService: Sendable {
             for item in rawEntries {
                 guard let date = item["date"] as? String,
                       Self.isValidDateString(date) else { continue }
-                let title = (item["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "AI 假期"
+                let title = (item["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "AI Holiday"
                 let kindRaw = (item["kind"] as? String) ?? "publicHoliday"
                 let kind = HolidayEntryKind(rawValue: kindRaw)
                     ?? ICSHolidayParser.classifyEventKind(summary: title)
                 entries.append(
                     HolidayCalendarEntry(
                         date: date,
-                        title: title.isEmpty ? "AI 假期" : title,
+                        title: title.isEmpty ? "AI Holiday" : title,
                         kind: kind,
                         source: .byokLLM
                     )
@@ -265,7 +265,7 @@ public struct BYOKHolidayService: Sendable {
             urls.append(u)
         }
 
-        let summaryNote = (obj["summaryNote"] as? String) ?? "已提取 \(entries.count) 条假期/调休记录"
+        let summaryNote = (obj["summaryNote"] as? String) ?? "Extracted \(entries.count) holiday/workday entries"
         return BYOKExtractionResult(
             entries: entries.sorted { $0.date < $1.date },
             discoveredCalendarURLs: urls,
@@ -273,7 +273,7 @@ public struct BYOKHolidayService: Sendable {
         )
     }
 
-    // MARK: - Deterministic Offline Natural-Language & Link Parser (零网络兜底解析)
+    // MARK: - Deterministic Offline Natural-Language & Link Parser (Zero-Network Fallback)
 
     public func parseLocally(
         text: String,
@@ -284,36 +284,37 @@ public struct BYOKHolidayService: Sendable {
         let discoveredURLs = Self.extractCalendarURLs(from: text)
 
         var entries: [HolidayCalendarEntry] = []
-        let clauses = text.components(separatedBy: CharacterSet(charactersIn: "，,。；;\n"))
+        // Split on sentence/line boundaries only (not ".") so URLs like ".ics" stay intact.
+        let clauses = text.components(separatedBy: CharacterSet(charactersIn: ";\n"))
 
         for rawClause in clauses {
             let clause = rawClause.trimmingCharacters(in: .whitespacesAndNewlines)
             if clause.isEmpty { continue }
 
+            let lowerClause = clause.lowercased()
             let kind = ICSHolidayParser.classifyEventKind(summary: clause)
-            let title = Self.inferShortTitle(from: clause, kind: kind)
+            let title = Self.inferShortTitle(from: lowerClause, kind: kind)
 
-            // 1. Check relative dates ("今天", "明天", "后天")
-            if clause.contains("明天") || clause.contains("明日") {
+            // 1. Check relative dates ("today", "tomorrow", "day after tomorrow")
+            if lowerClause.contains("day after tomorrow") {
+                if let d = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: referenceDate)) {
+                    entries.append(HolidayCalendarEntry(date: engine.dateString(from: d), title: title, kind: kind, source: .byokLLM))
+                }
+            } else if lowerClause.contains("tomorrow") {
                 if let d = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: referenceDate)) {
                     entries.append(HolidayCalendarEntry(date: engine.dateString(from: d), title: title, kind: kind, source: .byokLLM))
                 }
             }
-            if clause.contains("后天") {
-                if let d = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: referenceDate)) {
-                    entries.append(HolidayCalendarEntry(date: engine.dateString(from: d), title: title, kind: kind, source: .byokLLM))
-                }
-            }
 
-            // 2. Check ISO range: YYYY-MM-DD 到/至/~ YYYY-MM-DD
+            // 2. Check ISO range: YYYY-MM-DD to/through/~/- YYYY-MM-DD
             let isoRangeDates = expandISODateRanges(in: clause)
             for dStr in isoRangeDates {
                 entries.append(HolidayCalendarEntry(date: dStr, title: title, kind: kind, source: .byokLLM))
             }
 
-            // 3. Check Chinese month/day range: M月D日-M月D日 or M月D日到D日
-            let cnDates = expandChineseMonthDayMentions(in: clause, defaultYear: refYear)
-            for dStr in cnDates {
+            // 3. Check English month/day mentions: "October 26 to 28, 2026" or "October 31, 2026"
+            let monthDayDates = expandEnglishMonthDayMentions(in: clause, defaultYear: refYear)
+            for dStr in monthDayDates {
                 entries.append(HolidayCalendarEntry(date: dStr, title: title, kind: kind, source: .byokLLM))
             }
         }
@@ -329,8 +330,8 @@ public struct BYOKHolidayService: Sendable {
         }
 
         let summary = unique.isEmpty && discoveredURLs.isEmpty
-            ? "未识别到明确的日期，请尝试输入如“10月26日到28日休年假，10月31日补班”"
-            : "本地识别出 \(unique.count) 个日期条目" + (discoveredURLs.isEmpty ? "" : " 及 \(discoveredURLs.count) 个日历链接")
+            ? "No clear dates recognized. Try input like \"Annual leave Oct 26 to 28, makeup Saturday Oct 31.\""
+            : "Parsed \(unique.count) local date entries" + (discoveredURLs.isEmpty ? "" : " and \(discoveredURLs.count) calendar link(s)")
 
         return BYOKExtractionResult(
             entries: unique.sorted { $0.date < $1.date },
@@ -366,8 +367,8 @@ public struct BYOKHolidayService: Sendable {
         let engine = AlarmScheduleEngine(calendar: calendar)
         var results: [String] = []
 
-        // Range pattern: YYYY-MM-DD (到|至|-|~|to) YYYY-MM-DD
-        let rangePattern = #"(\d{4}-\d{2}-\d{2})\s*(?:到|至|~|—|-|to)\s*(\d{4}-\d{2}-\d{2})"#
+        // Range pattern: YYYY-MM-DD (to|through|~|–|-) YYYY-MM-DD
+        let rangePattern = #"(\d{4}-\d{2}-\d{2})\s*(?:to|through|~|–|-)\s*(\d{4}-\d{2}-\d{2})"#
         if let regex = try? NSRegularExpression(pattern: rangePattern, options: [.caseInsensitive]) {
             let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
             for match in regex.matches(in: text, range: nsRange) {
@@ -404,26 +405,42 @@ public struct BYOKHolidayService: Sendable {
         return results
     }
 
-    private func expandChineseMonthDayMentions(in text: String, defaultYear: Int) -> [String] {
+    private static let monthPattern = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?"
+    private static let monthNumbers: [String: Int] = [
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
+    ]
+
+    private static func monthNumber(from matchedName: String) -> Int? {
+        monthNumbers[String(matchedName.lowercased().prefix(3))]
+    }
+
+    private func expandEnglishMonthDayMentions(in text: String, defaultYear: Int) -> [String] {
         let engine = AlarmScheduleEngine(calendar: calendar)
         var results: [String] = []
 
-        // Pattern A: (YYYY年)?M月D日(到|至|-|~)(M月)?D日
-        let rangePattern = #"(?:(\d{4})年)?(\d{1,2})月(\d{1,2})[日号]\s*(?:到|至|~|—|-)\s*(?:(\d{1,2})月)?(\d{1,2})[日号]"#
+        // Pattern A: <Month> <Day>[, <Year>] (to|through|-|–) [<Month>] <Day>[, <Year>]
+        let rangePattern = #"(?i)(\#(Self.monthPattern))\s+(\d{1,2})(?:,?\s+(\d{4}))?\s*(?:to|through|-|–)\s*(?:(\#(Self.monthPattern))\s+)?(\d{1,2})(?:,?\s+(\d{4}))?"#
         if let regex = try? NSRegularExpression(pattern: rangePattern) {
             let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
             for match in regex.matches(in: text, range: nsRange) {
-                let year = Range(match.range(at: 1), in: text).flatMap { Int(text[$0]) } ?? defaultYear
-                guard let rM1 = Range(match.range(at: 2), in: text),
-                      let rD1 = Range(match.range(at: 3), in: text),
-                      let rD2 = Range(match.range(at: 5), in: text),
-                      let m1 = Int(text[rM1]),
-                      let d1 = Int(text[rD1]),
-                      let d2 = Int(text[rD2]) else { continue }
-                let m2 = Range(match.range(at: 4), in: text).flatMap { Int(text[$0]) } ?? m1
+                guard let rMonth1 = Range(match.range(at: 1), in: text),
+                      let rDay1 = Range(match.range(at: 2), in: text),
+                      let month1 = Self.monthNumber(from: String(text[rMonth1])),
+                      let day1 = Int(text[rDay1]) else { continue }
+                let month2: Int
+                if let rMonth2 = Range(match.range(at: 4), in: text), let m2 = Self.monthNumber(from: String(text[rMonth2])) {
+                    month2 = m2
+                } else {
+                    month2 = month1
+                }
+                guard let rDay2 = Range(match.range(at: 5), in: text), let day2 = Int(text[rDay2]) else { continue }
+                let year1 = Range(match.range(at: 3), in: text).flatMap { Int(text[$0]) }
+                let year2 = Range(match.range(at: 6), in: text).flatMap { Int(text[$0]) }
+                let year = year1 ?? year2 ?? defaultYear
 
-                let s1 = String(format: "%04d-%02d-%02d", year, m1, d1)
-                let s2 = String(format: "%04d-%02d-%02d", year, m2, d2)
+                let s1 = String(format: "%04d-%02d-%02d", year, month1, day1)
+                let s2 = String(format: "%04d-%02d-%02d", year, month2, day2)
                 if let start = engine.date(from: s1), let end = engine.date(from: s2), start <= end {
                     var cur = start
                     var count = 0
@@ -437,17 +454,17 @@ public struct BYOKHolidayService: Sendable {
             }
         }
 
-        // Pattern B: Single (YYYY年)?M月D日
-        let singlePattern = #"(?:(\d{4})年)?(\d{1,2})月(\d{1,2})[日号]"#
+        // Pattern B: Single <Month> <Day>[, <Year>]
+        let singlePattern = #"(?i)(\#(Self.monthPattern))\s+(\d{1,2})(?:,?\s+(\d{4}))?"#
         if let regex = try? NSRegularExpression(pattern: singlePattern) {
             let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
             for match in regex.matches(in: text, range: nsRange) {
-                let year = Range(match.range(at: 1), in: text).flatMap { Int(text[$0]) } ?? defaultYear
-                guard let rM = Range(match.range(at: 2), in: text),
-                      let rD = Range(match.range(at: 3), in: text),
-                      let m = Int(text[rM]),
-                      let d = Int(text[rD]) else { continue }
-                let s = String(format: "%04d-%02d-%02d", year, m, d)
+                guard let rMonth = Range(match.range(at: 1), in: text),
+                      let rDay = Range(match.range(at: 2), in: text),
+                      let month = Self.monthNumber(from: String(text[rMonth])),
+                      let day = Int(text[rDay]) else { continue }
+                let year = Range(match.range(at: 3), in: text).flatMap { Int(text[$0]) } ?? defaultYear
+                let s = String(format: "%04d-%02d-%02d", year, month, day)
                 if Self.isValidDateString(s) && !results.contains(s) {
                     results.append(s)
                 }
@@ -457,20 +474,23 @@ public struct BYOKHolidayService: Sendable {
         return results
     }
 
-    private static func inferShortTitle(from clause: String, kind: HolidayEntryKind) -> String {
+    private static func inferShortTitle(from lowerClause: String, kind: HolidayEntryKind) -> String {
         switch kind {
         case .makeupWorkday:
-            return "调休补班"
+            return "Makeup Workday"
         case .personalLeave:
-            if clause.contains("年假") { return "个人年假" }
-            if clause.contains("病假") { return "病假休息" }
-            return "个人休假"
+            if lowerClause.contains("annual leave") { return "Annual Leave" }
+            if lowerClause.contains("sick leave") { return "Sick Leave" }
+            return "Personal Leave"
         case .publicHoliday:
-            let knownNames = ["元旦", "春节", "清明", "劳动节", "端午", "中秋", "国庆", "屠妖节", "Deepavali", "圣诞", "公共假期"]
-            for name in knownNames where clause.contains(name) {
-                return name
+            let knownNames = [
+                "new year", "lunar new year", "qingming", "labor day", "dragon boat",
+                "mid-autumn", "national day", "deepavali", "christmas", "public holiday"
+            ]
+            for name in knownNames where lowerClause.contains(name) {
+                return name.capitalized
             }
-            return "公共假期"
+            return "Public Holiday"
         }
     }
 

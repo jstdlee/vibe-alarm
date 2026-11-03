@@ -1,13 +1,13 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// Native Apple HIG sheet for parsing holiday notices, HR leave emails, or `.ics` URLs
-/// via on-device deterministic rules or Keychain-backed BYOK LLM (Light Theme).
+/// Clean English sheet for pasting HR/holiday notices or `.ics` URLs and extracting
+/// dates on-device (offline rules) or via a Keychain-backed BYOK LLM.
 public struct BYOKInputSheet: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var inputText: String = "HR通知：我将在 2026年11月11日到11月12日休年假，11月21日周六调休补班。"
+    @State private var inputText: String = "HR Notice: I will take annual leave from November 11 to 12, 2026.\nI will work a makeup shift on Saturday, November 21, 2026."
     @State private var isExtracting: Bool = false
     @State private var errorMessage: String?
     @State private var extractionResult: BYOKExtractionResult?
@@ -17,125 +17,163 @@ public struct BYOKInputSheet: View {
     public init(viewModel: AppViewModel, preloadPreview: Bool = false) {
         self.viewModel = viewModel
         if preloadPreview {
-            let sample = "HR通知：我将在 2026年11月11日到11月12日休年假，11月21日周六调休补班。"
+            let sample = "HR Notice: I will take annual leave from November 11 to 12, 2026.\nI will work a makeup shift on Saturday, November 21, 2026."
             _extractionResult = State(initialValue: BYOKHolidayService().parseLocally(text: sample))
         }
     }
 
     public var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    TextEditor(text: $inputText)
-                        .frame(minHeight: 100)
-                        .font(.body)
-                } header: {
-                    Text("通知或请假文本")
-                        .textCase(nil)
-                } footer: {
-                    Text("支持粘贴放假通知、请假邮件或包含 .ics 的订阅链接。默认优先在设备本地离线解析。")
-                }
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 12) {
+                    inputCard
+                    actionsCard
 
-                Section {
-                    Button {
-                        runOfflineParse()
-                    } label: {
-                        HStack {
-                            Text("本地规则解析")
-                                .foregroundStyle(.orange)
-                            Spacer()
-                            Text("离线")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Button {
-                        Task { await runBYOKLLMParse() }
-                    } label: {
-                        HStack {
-                            Text("使用 BYOK 模型提取")
-                                .foregroundStyle(.orange)
-                            Spacer()
-                            if isExtracting {
-                                ProgressView()
-                            } else {
-                                Text(viewModel.snapshot.byokConfig.model)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .disabled(isExtracting)
-                }
-
-                if let errorMessage {
-                    Section {
+                    if let errorMessage {
                         Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .padding(.horizontal, 2)
+                    }
+
+                    if let result = extractionResult {
+                        resultsCard(result)
                     }
                 }
-
-                if let result = extractionResult {
-                    Section {
-                        ForEach(result.entries) { entry in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(entry.title)
-                                        .font(.body)
-                                    Text(entry.date)
-                                        .font(.footnote.monospacedDigit())
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(entry.kind.displayTitle)
-                                    .font(.footnote.weight(.medium))
-                                    .foregroundStyle(entry.kind == .makeupWorkday ? Color.blue : Color.orange)
-                            }
-                        }
-
-                        ForEach(result.discoveredCalendarURLs, id: \.self) { url in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("日历订阅链接")
-                                    .font(.subheadline)
-                                Text(url)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Button {
-                            viewModel.mergeExtractedEntries(result.entries, discoveredURLs: result.discoveredCalendarURLs)
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text("写入内置日历 (\(result.entries.count) 项)")
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.orange)
-                                Spacer()
-                            }
-                        }
-                        .disabled(result.entries.isEmpty && result.discoveredCalendarURLs.isEmpty)
-                    } header: {
-                        Text("解析结果")
-                            .textCase(nil)
-                    }
-                }
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("解析放假通知")
+            .background(Color.vibeCanvas)
+            .navigationTitle("Parse Holiday Notice")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
-                        .foregroundStyle(.orange)
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(.vibeAccent)
                 }
             }
         }
-        .tint(.orange)
+        .tint(.vibeAccent)
         .preferredColorScheme(.light)
+    }
+
+    private var inputCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("NOTICE OR LEAVE EMAIL")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
+            TextEditor(text: $inputText)
+                .frame(minHeight: 100)
+                .font(.subheadline)
+            Text("Paste a holiday notice, leave email, or a link to an .ics subscription.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .vibeCard()
+    }
+
+    private var actionsCard: some View {
+        HStack(spacing: 10) {
+            Button {
+                runOfflineParse()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.fill")
+                    Text("Parse On-Device")
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color(uiColor: .systemGray6))
+                .foregroundStyle(.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Task { await runBYOKLLMParse() }
+            } label: {
+                HStack(spacing: 6) {
+                    if isExtracting {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "sparkles")
+                    }
+                    Text("Parse with BYOK AI")
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.vibeAccent)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(isExtracting)
+        }
+    }
+
+    private func resultsCard(_ result: BYOKExtractionResult) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("RESULTS")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 0) {
+                ForEach(Array(result.entries.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 {
+                        Divider()
+                    }
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.title)
+                                .font(.subheadline)
+                            Text(entry.date)
+                                .font(.footnote.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(entry.kind.displayTitle)
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(entry.kind == .makeupWorkday ? Color.vibeWork : Color.vibeAccent)
+                    }
+                    .padding(.vertical, 6)
+                }
+
+                ForEach(result.discoveredCalendarURLs, id: \.self) { url in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Calendar Subscription Link")
+                            .font(.subheadline)
+                        Text(url)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .padding(.vertical, 6)
+                }
+            }
+
+            Button {
+                viewModel.mergeExtractedEntries(result.entries, discoveredURLs: result.discoveredCalendarURLs)
+                dismiss()
+            } label: {
+                Text("Add \(result.entries.count) to Calendar")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(Color.vibeAccent)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(result.entries.isEmpty && result.discoveredCalendarURLs.isEmpty)
+        }
+        .padding(14)
+        .vibeCard()
     }
 
     private func runOfflineParse() {
@@ -148,7 +186,7 @@ public struct BYOKInputSheet: View {
         let apiKey = KeychainHelper.loadAPIKey()
         if apiKey.isEmpty {
             extractionResult = service.parseLocally(text: inputText)
-            errorMessage = "未配置 API Key，已使用本地规则完成解析。"
+            errorMessage = "No API key configured. Parsed with on-device rules instead."
             return
         }
 

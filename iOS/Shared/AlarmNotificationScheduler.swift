@@ -4,7 +4,7 @@ import VibeAlarmCore
 
 /// Shared local notification scheduler used by both the main App and Widget `AppIntent` actions.
 /// Schedules:
-/// 1. Pre-bedtime interactive notification (长按可直接选择「跳过明日」「推迟 30m」「推迟 1h」「保持响铃」).
+/// 1. Pre-bedtime interactive notification (long-press for "Skip Tomorrow", "Delay 30m / 1h", or "Keep Ringing").
 /// 2. Multi-burst Time-Sensitive wake-up alarm notifications for Today & Tomorrow.
 public enum AlarmNotificationScheduler {
     private static let notificationPrefix = "com.jstdlee.vibealarm.scheduled."
@@ -12,27 +12,27 @@ public enum AlarmNotificationScheduler {
     public static func registerNotificationCategories() {
         let skipAction = UNNotificationAction(
             identifier: AppConstants.actionSkipTomorrow,
-            title: "跳过明日闹钟 (次日自动恢复)",
+            title: "Skip Tomorrow (Auto-Restores)",
             options: []
         )
         let delay30Action = UNNotificationAction(
             identifier: AppConstants.actionDelay30m,
-            title: "推迟 30 分钟 (+30m)",
+            title: "Delay 30 Minutes (+30m)",
             options: []
         )
         let delay60Action = UNNotificationAction(
             identifier: AppConstants.actionDelay60m,
-            title: "推迟 1 小时 (+1h)",
+            title: "Delay 1 Hour (+1h)",
             options: []
         )
         let restoreAction = UNNotificationAction(
             identifier: AppConstants.actionRestoreTomorrow,
-            title: "恢复原定时间",
+            title: "Restore Original Time",
             options: []
         )
         let keepAction = UNNotificationAction(
             identifier: AppConstants.actionKeepTomorrow,
-            title: "强制保持明日响铃",
+            title: "Keep Tomorrow's Alarm On",
             options: []
         )
 
@@ -108,7 +108,7 @@ public enum AlarmNotificationScheduler {
                 let content = UNMutableNotificationContent()
                 content.title = "⏰ \(snapshot.alarmRule.label) · \(resolved.effectiveTime ?? resolved.baseTime)"
                 content.subtitle = "\(resolved.displayLabel) (\(resolved.weekdayText)) · \(resolved.reasonBadge)"
-                content.body = "长按通知可选择「推迟 30 分钟」。次日排期将自动恢复正常。"
+                content.body = "Long-press this notification to delay by 30 minutes. Tomorrow's schedule restores automatically."
                 content.sound = .defaultCritical
                 content.categoryIdentifier = AppConstants.wakeAlarmCategoryIdentifier
                 content.interruptionLevel = .timeSensitive
@@ -120,7 +120,7 @@ public enum AlarmNotificationScheduler {
             }
         }
 
-        // 2. Schedule Pre-Bedtime Reminder Notification (睡觉前提醒明日闹钟状态)
+        // 2. Schedule Pre-Bedtime Reminder Notification previewing tomorrow's alarm status
         if snapshot.alarmRule.bedtimeReminderEnabled {
             let bedHour = snapshot.alarmRule.preBedtimeReminderMinutes / 60
             let bedMin = snapshot.alarmRule.preBedtimeReminderMinutes % 60
@@ -132,13 +132,13 @@ public enum AlarmNotificationScheduler {
             if let bedDate = calendar.date(from: bedComps), bedDate > referenceDate {
                 let content = UNMutableNotificationContent()
                 if let effTime = tomorrow.effectiveTime, tomorrow.status.isRinging {
-                    content.title = "🌙 睡前闹钟确认：明天 \(effTime) 响铃"
-                    content.subtitle = "明天 (\(tomorrow.weekdayText)) · \(tomorrow.reasonBadge)"
-                    content.body = "长按此通知可一键「跳过明日闹钟」或「推迟 30m / 1h」，后天将自动恢复原定排期。"
+                    content.title = "🌙 Bedtime Check · Tomorrow Rings at \(effTime)"
+                    content.subtitle = "Tomorrow (\(tomorrow.weekdayText)) · \(tomorrow.reasonBadge)"
+                    content.body = "Long-press this notification to Skip Tomorrow or Delay +30m/+1h. The day after restores automatically."
                 } else {
-                    content.title = "🌙 睡前提醒：明天无需早起 (\(tomorrow.reasonBadge))"
-                    content.subtitle = "明天 (\(tomorrow.weekdayText)) 原定 \(tomorrow.baseTime) 已跳过"
-                    content.body = "明天可安心睡个懒觉！如需临时早起，长按此通知可选择「强制保持明日响铃」。"
+                    content.title = "🌙 Bedtime Check · No Alarm Tomorrow (\(tomorrow.reasonBadge))"
+                    content.subtitle = "Tomorrow (\(tomorrow.weekdayText)) was skipped from \(tomorrow.baseTime)"
+                    content.body = "Sleep in tomorrow! If you need to wake up anyway, long-press to Keep Tomorrow's Alarm On."
                 }
                 content.sound = .default
                 content.categoryIdentifier = AppConstants.bedtimeCategoryIdentifier

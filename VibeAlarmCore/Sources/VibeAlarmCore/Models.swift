@@ -15,27 +15,27 @@ public enum Weekday: Int, Codable, CaseIterable, Hashable, Sendable, Comparable 
         lhs.rawValue < rhs.rawValue
     }
 
-    public var shortChineseName: String {
+    public var shortWeekdayName: String {
         switch self {
-        case .sunday: return "周日"
-        case .monday: return "周一"
-        case .tuesday: return "周二"
-        case .wednesday: return "周三"
-        case .thursday: return "周四"
-        case .friday: return "周五"
-        case .saturday: return "周六"
+        case .sunday: return "Sun"
+        case .monday: return "Mon"
+        case .tuesday: return "Tue"
+        case .wednesday: return "Wed"
+        case .thursday: return "Thu"
+        case .friday: return "Fri"
+        case .saturday: return "Sat"
         }
     }
 
     public var compactLabel: String {
         switch self {
-        case .sunday: return "日"
-        case .monday: return "一"
-        case .tuesday: return "二"
-        case .wednesday: return "三"
-        case .thursday: return "四"
-        case .friday: return "五"
-        case .saturday: return "六"
+        case .sunday: return "Su"
+        case .monday: return "Mo"
+        case .tuesday: return "Tu"
+        case .wednesday: return "We"
+        case .thursday: return "Th"
+        case .friday: return "Fr"
+        case .saturday: return "Sa"
         }
     }
 
@@ -63,26 +63,26 @@ public enum AlarmRepeatMode: Codable, Equatable, Hashable, Sendable {
     public var summaryText: String {
         switch self {
         case .weekdays:
-            return "工作日 (智能节假日/调休)"
+            return "Workdays (Smart Holiday & Makeup)"
         case .everyday:
-            return "每天"
+            return "Every Day"
         case .customDays(let days):
             if days == Weekday.standardWeekdays {
-                return "周一至周五"
+                return "Mon–Fri"
             }
             if days.isEmpty {
-                return "单次"
+                return "One-Time"
             }
-            return days.sorted().map(\.shortChineseName).joined(separator: " ")
+            return days.sorted().map(\.shortWeekdayName).joined(separator: " ")
         case .specificDates(let dates):
             if dates.isEmpty {
-                return "未指定日期"
+                return "No Dates Set"
             }
             let sorted = dates.sorted()
             if sorted.count <= 2 {
-                return "指定: " + sorted.joined(separator: ", ")
+                return "Dates: " + sorted.joined(separator: ", ")
             }
-            return "指定 \(sorted.count) 个日期"
+            return "\(sorted.count) Dates Selected"
         }
     }
 }
@@ -96,7 +96,7 @@ public struct AlarmRule: Codable, Identifiable, Equatable, Sendable {
     public var minute: Int
     public var isEnabled: Bool
     public var repeatMode: AlarmRepeatMode
-    /// When enabled, public holidays skip the alarm and statutory makeup workdays (调休补班) activate it on weekends.
+    /// When enabled, public holidays skip the alarm and statutory makeup workdays activate it on weekends.
     public var skipPublicHolidays: Bool
     /// When enabled, personal leave events (from local EventKit calendar or BYOK AI calendar) skip the alarm.
     public var skipPersonalLeave: Bool
@@ -108,7 +108,7 @@ public struct AlarmRule: Codable, Identifiable, Equatable, Sendable {
 
     public init(
         id: UUID = UUID(),
-        label: String = "早起闹钟",
+        label: String = "Wake Alarm",
         hour: Int = 7,
         minute: Int = 30,
         isEnabled: Bool = true,
@@ -143,7 +143,7 @@ public struct AlarmRule: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
-// MARK: - Next-Day Override (一键推迟 / 跳过 / 恢复次日闹钟)
+// MARK: - Next-Day Override (One-Tap Skip / Delay / Restore)
 
 public enum NextDayOverrideAction: Codable, Equatable, Sendable {
     case none
@@ -176,26 +176,26 @@ public struct NextDayOverride: Codable, Equatable, Sendable {
 // MARK: - Holiday & Leave Calendar Entry
 
 public enum HolidayEntryKind: String, Codable, CaseIterable, Sendable {
-    /// Statutory public holiday (法定节假日 / 公共假期) -> skips alarm.
+    /// Statutory public holiday -> skips alarm.
     case publicHoliday
-    /// Statutory makeup workday on a weekend (调休补班) -> triggers workday alarm.
+    /// Statutory makeup workday on a weekend -> triggers workday alarm.
     case makeupWorkday
-    /// Personal vacation / PTO / leave (个人休假 / 年假 / 病假) -> skips alarm.
+    /// Personal vacation / PTO / leave -> skips alarm.
     case personalLeave
 
     public var displayTitle: String {
         switch self {
-        case .publicHoliday: return "公共假期 (休)"
-        case .makeupWorkday: return "调休补班 (班)"
-        case .personalLeave: return "个人请假 (休)"
+        case .publicHoliday: return "Public Holiday"
+        case .makeupWorkday: return "Makeup Workday"
+        case .personalLeave: return "Personal Leave"
         }
     }
 
     public var shortBadge: String {
         switch self {
-        case .publicHoliday: return "公休"
-        case .makeupWorkday: return "补班"
-        case .personalLeave: return "请假"
+        case .publicHoliday: return "OFF"
+        case .makeupWorkday: return "WRK"
+        case .personalLeave: return "PTO"
         }
     }
 }
@@ -208,10 +208,10 @@ public enum HolidayEntrySource: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .builtin: return "内置日历"
-        case .externalICS: return "外部 ICS 订阅"
-        case .localEventKit: return "本地系统日历"
-        case .byokLLM: return "BYOK AI 录入"
+        case .builtin: return "Built-in Calendar"
+        case .externalICS: return "External .ics Subscription"
+        case .localEventKit: return "iOS Calendar (EventKit)"
+        case .byokLLM: return "BYOK AI Entry"
         }
     }
 }
@@ -246,9 +246,9 @@ public enum HolidayRegionHint: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .sg: return "新加坡 (SG MOM)"
-        case .cn: return "中国大陆 (国务院放假调休)"
-        case .custom: return "自定义 iCal (.ics)"
+        case .sg: return "Singapore (MOM)"
+        case .cn: return "Mainland China (State Council)"
+        case .custom: return "Custom iCal (.ics)"
         }
     }
 }
@@ -280,7 +280,7 @@ public struct ExternalCalendarSubscription: Codable, Identifiable, Equatable, Se
     public static let defaultPresets: [ExternalCalendarSubscription] = [
         ExternalCalendarSubscription(
             id: UUID(uuidString: "11111111-2222-3333-4444-555555555501")!,
-            name: "中国大陆法定节假日与调休订阅",
+            name: "China Statutory Holidays & Workdays",
             url: "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/2026.ics",
             regionHint: .cn,
             isEnabled: true
@@ -295,7 +295,7 @@ public struct ExternalCalendarSubscription: Codable, Identifiable, Equatable, Se
     ]
 }
 
-// MARK: - Resolved Day Alarm (最近两天及未来排期计算结果)
+// MARK: - Resolved Day Alarm (Today, Tomorrow, and Upcoming Schedule Results)
 
 public enum ResolvedAlarmStatus: Codable, Equatable, Sendable {
     case scheduled
@@ -319,9 +319,9 @@ public struct ResolvedDayAlarm: Codable, Identifiable, Equatable, Sendable {
     public var id: String { date }
     /// `YYYY-MM-DD`
     public var date: String
-    /// e.g. "今天", "明天", "后天", or weekday name
+    /// e.g. "Today", "Tomorrow", "In 2 Days", or "Nov 10"
     public var displayLabel: String
-    /// e.g. "周六", "周日", "周一"
+    /// e.g. "Sun", "Mon", "Tue"
     public var weekdayText: String
     /// Original configured time (`HH:mm`)
     public var baseTime: String
@@ -369,19 +369,19 @@ public struct ResolvedDayAlarm: Codable, Identifiable, Equatable, Sendable {
 public enum BuiltinHolidays {
     public static let entries2026: [HolidayCalendarEntry] = [
         // China 2026 National Day & Mid-Autumn + Makeup Workdays
-        HolidayCalendarEntry(date: "2026-09-25", title: "中秋节", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-01", title: "国庆节", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-02", title: "国庆节假期", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-03", title: "国庆节假期", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-04", title: "国庆节假期", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-05", title: "国庆节假期", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-06", title: "国庆节假期", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-07", title: "国庆节假期", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-10-10", title: "国庆节调休补班", kind: .makeupWorkday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-09-25", title: "Mid-Autumn Festival", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-01", title: "National Day", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-02", title: "National Day Holiday", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-03", title: "National Day Holiday", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-04", title: "National Day Holiday", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-05", title: "National Day Holiday", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-06", title: "National Day Holiday", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-07", title: "National Day Holiday", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-10-10", title: "National Day Makeup Workday", kind: .makeupWorkday, source: .builtin),
         // Singapore 2026 Deepavali (falls on Sunday Nov 8 -> Monday Nov 9 public holiday)
-        HolidayCalendarEntry(date: "2026-11-08", title: "Deepavali (屠妖节)", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-11-09", title: "Deepavali Observed (屠妖节补休)", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2026-12-25", title: "Christmas Day (圣诞节)", kind: .publicHoliday, source: .builtin),
-        HolidayCalendarEntry(date: "2027-01-01", title: "New Year's Day (元旦)", kind: .publicHoliday, source: .builtin)
+        HolidayCalendarEntry(date: "2026-11-08", title: "Deepavali", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-11-09", title: "Deepavali Observed", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2026-12-25", title: "Christmas Day", kind: .publicHoliday, source: .builtin),
+        HolidayCalendarEntry(date: "2027-01-01", title: "New Year's Day", kind: .publicHoliday, source: .builtin)
     ]
 }

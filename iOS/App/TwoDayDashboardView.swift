@@ -1,16 +1,13 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// Primary iOS Clock-style ("闹钟") screen in Apple Light Theme:
-/// - Clean `#F2F2F7` grouped background, `#FFFFFF` inset grouped cells, `#FF6B00` orange tint, light SF numerals.
-/// - Focused on **Today & Tomorrow (近两日)**: clearly shows statutory holiday skips, makeup workday activation, and one-tap temporary overrides that automatically restore the day after tomorrow.
+/// Screen 1 ("Alarms"): Braun/Apple Light Theme two-day dashboard.
+/// Shows Today & Tomorrow as spacious hero cards, a one-tap action bar for tomorrow,
+/// and a compact list of the next 5 days.
 public struct TwoDayDashboardView: View {
     @ObservedObject var viewModel: AppViewModel
 
     @State private var showEditAlarmSheet = false
-    @State private var showHolidayCalendar = false
-    @State private var showBYOKSheet = false
-    @State private var showSettings = false
 
     public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
@@ -18,306 +15,276 @@ public struct TwoDayDashboardView: View {
 
     public var body: some View {
         NavigationStack {
-            List {
-                // Section 1: Today & Tomorrow (近两日排期)
-                Section {
-                    clockAlarmRow(day: viewModel.todayAlarm, isTomorrow: false)
-                    clockAlarmRow(day: viewModel.tomorrowAlarm, isTomorrow: true)
-                } header: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bed.double.fill")
-                            .foregroundStyle(.orange)
-                        Text("睡眠｜起床闹钟 · 近两日")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .textCase(nil)
-                } footer: {
-                    Text("次日操作（「跳过明日」或「推迟 30 分钟」）仅对明天单次生效，后天自动恢复原定排期。")
-                        .font(.footnote)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 14) {
+                    header
+                    heroCard(day: viewModel.todayAlarm, isTomorrow: false)
+                    heroCard(day: viewModel.tomorrowAlarm, isTomorrow: true)
+                    tomorrowActionBar
+                    upcomingDaysCard
                 }
-
-                // Section 2: Next 5 Days Schedule (后续 5 日排期)
-                Section {
-                    ForEach(Array(viewModel.upcomingWeek.dropFirst(2))) { item in
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("\(item.weekdayText) · \(item.date.suffix(5))")
-                                    .font(.body.weight(.medium))
-                                    .foregroundStyle(.primary)
-                                Text(item.reasonBadge)
-                                    .font(.footnote)
-                                    .foregroundStyle(item.status.isRinging ? Color.secondary : Color.orange)
-                            }
-                            Spacer()
-                            if let eff = item.effectiveTime, item.status.isRinging {
-                                Text(eff)
-                                    .font(.system(size: 22, weight: .light, design: .rounded))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.primary)
-                            } else {
-                                Text("不响铃")
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                } header: {
-                    Text("后续 5 日排期")
-                        .textCase(nil)
-                }
-
-                // Section 3: Quick Entry to Built-in Calendar, External ICS & iOS EventKit Settings
-                Section {
-                    Button {
-                        showHolidayCalendar = true
-                    } label: {
-                        HStack {
-                            Label("管理内置日历与事项", systemImage: "calendar.badge.plus")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Text("\(viewModel.snapshot.holidayEntries.count) 项记录")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-
-                    Button {
-                        showSettings = true
-                    } label: {
-                        HStack {
-                            Label("外部日历订阅 (.ics) 与 iOS 日历权限", systemImage: "calendar.badge.checkmark")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Text("已启用 \(viewModel.snapshot.subscriptions.count) 源")
-                                .font(.subheadline)
-                                .foregroundStyle(.orange)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-
-                    Button {
-                        showBYOKSheet = true
-                    } label: {
-                        HStack {
-                            Label("解析放假通知或请假邮件 (BYOK AI)", systemImage: "doc.text.magnifyingglass")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Text("本地 / AI")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                } header: {
-                    Text("内置日历、外部订阅与系统日历")
-                        .textCase(nil)
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 20)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("闹钟")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("日历源设置") {
-                        showSettings = true
-                    }
-                    .foregroundStyle(.orange)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showEditAlarmSheet = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "dial.medium.fill")
-                            Text("设定时间")
-                        }
-                        .fontWeight(.semibold)
-                    }
-                    .foregroundStyle(.orange)
-                }
-            }
+            .background(Color.vibeCanvas)
+            .navigationBarHidden(true)
             .sheet(isPresented: $showEditAlarmSheet) {
                 DualThumbTimeDialSheet(viewModel: viewModel)
             }
-            .sheet(isPresented: $showHolidayCalendar) {
-                HolidayCalendarView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showBYOKSheet) {
-                BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView(viewModel: viewModel)
-            }
         }
-        .tint(.orange)
+        .tint(.vibeAccent)
         .preferredColorScheme(.light)
     }
 
-    // MARK: - Native iOS Clock-Style Alarm Row (Light Mode)
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("VibeAlarm")
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text("Smart Holiday & PTO Wake Schedule")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text("\(viewModel.snapshot.alarmRule.formattedBaseTime) · \(repeatShortLabel)")
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color(uiColor: .systemGray6))
+                .foregroundStyle(.secondary)
+                .clipShape(Capsule())
+        }
+    }
+
+    private var repeatShortLabel: String {
+        switch viewModel.snapshot.alarmRule.repeatMode {
+        case .weekdays: return "Workdays"
+        case .everyday: return "Every Day"
+        case .customDays: return "Custom"
+        case .specificDates: return "Dates"
+        }
+    }
+
+    // MARK: - Hero Card (Today / Tomorrow)
 
     @ViewBuilder
-    private func clockAlarmRow(day: ResolvedDayAlarm, isTomorrow: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    // Subtle top metadata line
-                    HStack(spacing: 6) {
-                        Text("\(day.displayLabel) · \(day.weekdayText)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
-                        Text("(\(day.date.suffix(5)))")
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Large thin Apple Clock numeral
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(day.effectiveTime ?? day.baseTime)
-                            .font(.system(size: 54, weight: .light, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(day.status.isRinging ? Color.primary : Color(uiColor: .tertiaryLabel))
-
-                        if let eff = day.effectiveTime, eff != day.baseTime, day.status.isRinging {
-                            Text("原定 \(day.baseTime)")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    // Clean status subtitle
-                    Text(statusSubtitle(for: day))
-                        .font(.subheadline)
-                        .foregroundStyle(day.status.isRinging ? Color.secondary : Color.orange)
-                }
-
+    private func heroCard(day: ResolvedDayAlarm, isTomorrow: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("\(isTomorrow ? "TOMORROW" : "TODAY") · \(dateCaption(for: day))")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
                 Spacer()
-
-                if isTomorrow {
-                    Toggle("", isOn: Binding(
-                        get: { day.status.isRinging },
-                        set: { shouldRing in
-                            if shouldRing {
-                                if day.hasManualOverride {
-                                    viewModel.performTomorrowOverride(.none)
-                                } else {
-                                    viewModel.performTomorrowOverride(.forceKeepTomorrow)
-                                }
-                            } else {
-                                viewModel.performTomorrowOverride(.skipTomorrow)
-                            }
-                        }
-                    ))
-                    .labelsHidden()
-                    .tint(.green)
-                } else {
-                    Button {
-                        showEditAlarmSheet = true
-                    } label: {
-                        Text("拨盘设定")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(Color.orange.opacity(0.14))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                showEditAlarmSheet = true
+                statusCapsule(for: day)
             }
 
-            // Clean secondary action bar for Tomorrow only (Apple Clock capsule buttons)
-            if isTomorrow {
-                Divider()
-                HStack(spacing: 8) {
-                    tomorrowCapsuleButton(
-                        title: "跳过明日",
-                        systemImage: "bell.slash",
-                        isActive: day.status == .skippedManually
-                    ) {
-                        viewModel.performTomorrowOverride(.skipTomorrow)
-                    }
+            timeReadout(for: day)
 
-                    tomorrowCapsuleButton(
-                        title: "推迟 30 分钟",
-                        systemImage: "plus.circle",
-                        isActive: isDelayed(day)
-                    ) {
-                        viewModel.incrementTomorrowDelay(by: 30)
-                    }
-
-                    if day.hasManualOverride {
-                        tomorrowCapsuleButton(
-                            title: "恢复原定",
-                            systemImage: "arrow.uturn.backward",
-                            isActive: true
-                        ) {
-                            viewModel.performTomorrowOverride(.none)
-                        }
-                    } else if !day.status.isRinging {
-                        tomorrowCapsuleButton(
-                            title: "明日照常响铃",
-                            systemImage: "bell",
-                            isActive: false
-                        ) {
-                            viewModel.performTomorrowOverride(.forceKeepTomorrow)
-                        }
-                    }
-                }
-                .padding(.top, 2)
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(statusColor(for: day))
+                    .frame(width: 7, height: 7)
+                Text(day.reasonBadge)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
-        .padding(.vertical, 4)
+        .padding(18)
+        .vibeCard()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showEditAlarmSheet = true
+        }
     }
 
-    private func statusSubtitle(for day: ResolvedDayAlarm) -> String {
+    @ViewBuilder
+    private func timeReadout(for day: ResolvedDayAlarm) -> some View {
         if day.status.isRinging {
-            return "\(viewModel.snapshot.alarmRule.label)，\(day.reasonBadge)"
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(day.effectiveTime ?? day.baseTime)
+                    .font(.system(size: 52, weight: .light, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.primary)
+                if let eff = day.effectiveTime, eff != day.baseTime {
+                    Text(day.baseTime)
+                        .font(.system(size: 18, weight: .regular, design: .rounded))
+                        .monospacedDigit()
+                        .strikethrough()
+                        .foregroundStyle(.secondary)
+                }
+            }
         } else {
-            return "不响铃 · \(day.reasonBadge)"
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("OFF")
+                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.vibePTO)
+                Text(day.baseTime)
+                    .font(.system(size: 28, weight: .light, design: .rounded))
+                    .monospacedDigit()
+                    .strikethrough()
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
-    private func isDelayed(_ day: ResolvedDayAlarm) -> Bool {
-        if case .delayed = day.status { return true }
-        return false
+    private func statusCapsule(for day: ResolvedDayAlarm) -> some View {
+        Text(statusWord(for: day))
+            .font(.system(size: 11, weight: .bold))
+            .tracking(0.5)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(statusColor(for: day).opacity(0.14))
+            .foregroundStyle(statusColor(for: day))
+            .clipShape(Capsule())
     }
 
-    private func tomorrowCapsuleButton(
+    private func statusWord(for day: ResolvedDayAlarm) -> String {
+        switch day.status {
+        case .scheduled: return "RINGING"
+        case .delayed: return "DELAYED"
+        case .skippedByHoliday, .skippedByPersonalLeave, .skippedManually, .noAlarm: return "SKIPPED"
+        }
+    }
+
+    private func statusColor(for day: ResolvedDayAlarm) -> Color {
+        switch day.status {
+        case .scheduled: return .vibeAccent
+        case .delayed: return .vibeWork
+        case .skippedByHoliday, .skippedByPersonalLeave, .skippedManually, .noAlarm: return .vibePTO
+        }
+    }
+
+    private func dateCaption(for day: ResolvedDayAlarm) -> String {
+        "\(day.weekdayText.uppercased()) \(Self.monthDayCaption(day.date))"
+    }
+
+    // MARK: - Tomorrow One-Tap Action Bar
+
+    private var tomorrowActionBar: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                actionPill(title: "Skip", systemImage: "bell.slash", isActive: viewModel.tomorrowAlarm.status == .skippedManually) {
+                    viewModel.performTomorrowOverride(.skipTomorrow)
+                }
+                actionPill(title: "+30m", systemImage: "clock", isActive: false) {
+                    viewModel.incrementTomorrowDelay(by: 30)
+                }
+                actionPill(title: "+1h", systemImage: "clock.arrow.circlepath", isActive: false) {
+                    viewModel.incrementTomorrowDelay(by: 60)
+                }
+                if viewModel.tomorrowAlarm.hasManualOverride {
+                    actionPill(title: "Restore", systemImage: "arrow.uturn.backward", isActive: true) {
+                        viewModel.performTomorrowOverride(.none)
+                    }
+                } else {
+                    actionPill(title: "Keep On", systemImage: "bell", isActive: false) {
+                        viewModel.performTomorrowOverride(.forceKeepTomorrow)
+                    }
+                }
+            }
+            Text("Auto-restores to \(viewModel.snapshot.alarmRule.formattedBaseTime) the following day")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .vibeCard()
+    }
+
+    private func actionPill(
         title: String,
         systemImage: String,
         isActive: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 4) {
+            VStack(spacing: 4) {
                 Image(systemName: systemImage)
-                    .font(.caption)
+                    .font(.system(size: 14))
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
-            .background(
-                isActive
-                    ? Color.orange
-                    : Color.orange.opacity(0.12)
-            )
-            .foregroundStyle(isActive ? Color.white : Color.orange)
-            .clipShape(Capsule())
+            .padding(.vertical, 9)
+            .background(isActive ? Color.vibeAccent : Color(uiColor: .systemGray6))
+            .foregroundStyle(isActive ? Color.white : Color.primary)
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Upcoming 5 Days Card
+
+    private var upcomingDaysCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("UPCOMING")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 0) {
+                ForEach(Array(viewModel.upcomingWeek.dropFirst(2).enumerated()), id: \.element.id) { index, item in
+                    if index > 0 {
+                        Divider()
+                    }
+                    HStack {
+                        Text("\(item.weekdayText) \(Self.monthDayCaption(item.date))")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .frame(width: 92, alignment: .leading)
+
+                        Text(shortReasonTag(for: item))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        Text(item.status.isRinging ? (item.effectiveTime ?? item.baseTime) : "OFF")
+                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(item.status.isRinging ? Color.primary : Color.secondary)
+                    }
+                    .padding(.vertical, 9)
+                }
+            }
+        }
+        .padding(16)
+        .vibeCard()
+    }
+
+    private func shortReasonTag(for day: ResolvedDayAlarm) -> String {
+        switch day.status {
+        case .scheduled, .delayed:
+            return day.matchedEntries.contains(where: { $0.kind == .makeupWorkday }) ? "Makeup" : "Workday"
+        case .skippedByHoliday:
+            return "Holiday"
+        case .skippedByPersonalLeave:
+            return "PTO"
+        case .skippedManually:
+            return "Skipped"
+        case .noAlarm:
+            return "Off"
+        }
+    }
+
+    private static let monthAbbreviations = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    private static func monthDayCaption(_ dateString: String) -> String {
+        let parts = dateString.split(separator: "-")
+        guard parts.count == 3, let month = Int(parts[1]), let day = Int(parts[2]), (1...12).contains(month) else {
+            return dateString
+        }
+        return "\(monthAbbreviations[month - 1]) \(day)"
     }
 }

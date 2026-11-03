@@ -83,151 +83,102 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             TwoDayDashboardView(viewModel: viewModel)
                 .tabItem {
-                    Label("闹钟", systemImage: "alarm.fill")
+                    Label("Alarms", systemImage: "alarm.fill")
                 }
                 .tag(MainAppTab.dashboard)
 
             DualThumbTimeDialSheet(viewModel: viewModel, isEmbeddedInTab: true)
                 .tabItem {
-                    Label("设定时间", systemImage: "dial.medium.fill")
+                    Label("Time Dial", systemImage: "dial.medium.fill")
                 }
                 .tag(MainAppTab.dial)
 
-            HolidayCalendarView(viewModel: viewModel, isEmbeddedInTab: true)
+            HolidayCalendarView(viewModel: viewModel)
                 .tabItem {
-                    Label("内置日历与事项", systemImage: "calendar.badge.plus")
+                    Label("Calendar", systemImage: "calendar")
                 }
                 .tag(MainAppTab.calendar)
 
-            SettingsView(viewModel: viewModel, isEmbeddedInTab: true)
+            SettingsView(viewModel: viewModel)
                 .tabItem {
-                    Label("日历源与权限", systemImage: "calendar.badge.checkmark")
+                    Label("Sources", systemImage: "slider.horizontal.3")
                 }
                 .tag(MainAppTab.settings)
 
             if showWidgetTab {
                 WidgetAndBedtimeShowcaseView(viewModel: viewModel)
                     .tabItem {
-                        Label("小组件与AI", systemImage: "rectangle.grid.2x2.fill")
+                        Label("Widgets", systemImage: "rectangle.grid.2x2.fill")
                     }
                     .tag(MainAppTab.widget)
             }
         }
-        .tint(.orange)
+        .tint(.vibeAccent)
         .preferredColorScheme(.light)
     }
 }
 
-// MARK: - Native Showcase View for Interactive Widget, Bedtime Notification & BYOK AI Preview (Light Theme)
+// MARK: - Screen 5: Widget, Bedtime Notification & BYOK AI Showcase (Light Theme)
 
 struct WidgetAndBedtimeShowcaseView: View {
     @ObservedObject var viewModel: AppViewModel
+    @State private var didSendPreview = false
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .top) {
-                            widgetDayColumn(day: viewModel.todayAlarm, isTomorrow: false)
-                            Divider()
-                                .padding(.horizontal, 6)
-                            widgetDayColumn(day: viewModel.tomorrowAlarm, isTomorrow: true)
-                        }
-
-                        HStack(spacing: 8) {
-                            widgetPillButton(title: "跳过明日")
-                            widgetPillButton(title: "推迟 30 分钟")
-                            widgetPillButton(title: "恢复原定")
-                        }
-                    }
-                    .padding(.vertical, 6)
-                } header: {
-                    Text("桌面交互小组件 (中号 · SystemMedium)")
-                        .textCase(nil)
-                } footer: {
-                    Text("添加至主屏幕后无需打开应用即可直接控制明日闹钟，后天自动恢复原定排期。")
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 12) {
+                    widgetPreviewCard
+                    bedtimeNotificationCard
+                    byokParserCard
                 }
-
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "alarm.fill")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                            Text("闹钟 · 睡前提醒")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("22:30")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Text("明日免响铃 · \(viewModel.tomorrowAlarm.reasonBadge)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-
-                        Text("明天 (\(viewModel.tomorrowAlarm.weekdayText)) 原定 \(viewModel.tomorrowAlarm.baseTime)。长按通知可临时更改明日排期。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-
-                    notificationActionRow(title: "跳过明日闹钟", systemImage: "bell.slash")
-                    notificationActionRow(title: "推迟 30 分钟", systemImage: "plus.circle")
-                    notificationActionRow(title: "推迟 1 小时", systemImage: "clock.arrow.circlepath")
-                    notificationActionRow(title: "恢复原定时间", systemImage: "arrow.uturn.backward")
-                } header: {
-                    Text("睡前确认通知 (22:30 长按快捷操作)")
-                        .textCase(nil)
-                }
-
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Label("AI 解析放假通知与请假邮件", systemImage: "sparkles")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.orange)
-                            Spacer()
-                            Text("本地规则 + BYOK")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Text("自动识别文本中的「11月11日-12日休年假，11月21日周六调休补班」，一键写入内置日历。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 2)
-                } header: {
-                    Text("BYOK 智能解析能力")
-                        .textCase(nil)
-                }
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("小组件与睡前通知")
+            .background(Color.vibeCanvas)
+            .navigationTitle("Widgets")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .tint(.orange)
+        .tint(.vibeAccent)
         .preferredColorScheme(.light)
+    }
+
+    // MARK: 1. SystemMedium Widget Preview
+
+    private var widgetPreviewCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            cardHeader(caption: "DESKTOP WIDGET", trailing: "SystemMedium")
+
+            HStack(alignment: .top, spacing: 14) {
+                widgetDayColumn(day: viewModel.todayAlarm, isTomorrow: false)
+                widgetDayColumn(day: viewModel.tomorrowAlarm, isTomorrow: true)
+            }
+
+            HStack(spacing: 8) {
+                widgetPillButton(title: "Skip")
+                widgetPillButton(title: "+30m")
+                widgetPillButton(title: "+1h")
+                widgetPillButton(title: "Restore")
+            }
+        }
+        .padding(16)
+        .vibeCard()
     }
 
     private func widgetDayColumn(day: ResolvedDayAlarm, isTomorrow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Image(systemName: "alarm.fill")
-                    .font(.caption2)
-                Text("\(day.displayLabel) · \(day.weekdayText)")
-                    .font(.caption.weight(.semibold))
-            }
-            .foregroundStyle(isTomorrow ? Color.orange : Color.secondary)
+            Text(isTomorrow ? "TOMORROW" : "TODAY")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(isTomorrow ? Color.vibeAccent : Color.vibeInkMuted)
 
-            Text(day.effectiveTime ?? day.baseTime)
-                .font(.system(size: 34, weight: .light, design: .rounded))
+            Text(day.status.isRinging ? (day.effectiveTime ?? day.baseTime) : "OFF")
+                .font(.system(size: 30, weight: .light, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(day.status.isRinging ? Color.primary : Color(uiColor: .tertiaryLabel))
+                .foregroundStyle(day.status.isRinging ? Color.vibeInk : Color.vibeInkMuted)
 
-            Text(day.status.isRinging ? day.reasonBadge : "不响铃 · \(day.reasonBadge)")
+            Text(day.reasonBadge)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -238,21 +189,109 @@ struct WidgetAndBedtimeShowcaseView: View {
     private func widgetPillButton(title: String) -> some View {
         Text(title)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.orange)
+            .foregroundStyle(Color.vibeAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 7)
-            .background(Color.orange.opacity(0.12))
+            .background(Color.vibeAccent.opacity(0.12))
             .clipShape(Capsule())
     }
 
-    private func notificationActionRow(title: String, systemImage: String) -> some View {
-        HStack {
+    // MARK: 2. Bedtime Confirmation Notification
+
+    private var bedtimeNotificationCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            cardHeader(caption: "BEDTIME CONFIRMATION", trailing: viewModel.snapshot.alarmRule.formattedBedtimeReminder)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.tomorrowAlarm.status.isRinging ? "Tomorrow Rings · \(viewModel.tomorrowAlarm.effectiveTime ?? viewModel.tomorrowAlarm.baseTime)" : "No Alarm Tomorrow")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(viewModel.tomorrowAlarm.reasonBadge)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 8) {
+                notificationActionPill(title: "Skip Tomorrow") {
+                    viewModel.performTomorrowOverride(.skipTomorrow)
+                }
+                notificationActionPill(title: "Delay +30m") {
+                    viewModel.incrementTomorrowDelay(by: 30)
+                }
+                notificationActionPill(title: "Delay +1h") {
+                    viewModel.incrementTomorrowDelay(by: 60)
+                }
+                notificationActionPill(title: "Keep Ringing") {
+                    viewModel.performTomorrowOverride(.forceKeepTomorrow)
+                }
+            }
+
+            Button {
+                Task {
+                    await viewModel.sendInstantBedtimePreviewNotification()
+                    didSendPreview = true
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "bell.badge")
+                    Text(didSendPreview ? "Preview Sent" : "Send Live Preview")
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(Color.vibeAccent)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .vibeCard()
+    }
+
+    private func notificationActionPill(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Text(title)
-                .font(.body)
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(Color(uiColor: .systemGray6))
                 .foregroundStyle(.primary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: 3. BYOK AI Parser Summary
+
+    private var byokParserCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            cardHeader(caption: "ON-DEVICE AI PARSER", trailing: "BYOK")
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(Color.vibeAccent)
+                Text("Parses HR notices and leave emails into calendar entries")
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+        }
+        .padding(16)
+        .vibeCard()
+    }
+
+    // MARK: Shared Card Header
+
+    private func cardHeader(caption: String, trailing: String) -> some View {
+        HStack {
+            Text(caption)
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
             Spacer()
-            Image(systemName: systemImage)
-                .foregroundStyle(.orange)
+            Text(trailing)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.vibeAccent)
         }
     }
 }

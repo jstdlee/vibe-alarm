@@ -33,7 +33,7 @@ public struct VibeAlarmSnapshot: Codable, Equatable, Sendable {
     }
 
     public static let defaultLeaveKeywords: [String] = [
-        "请假", "休假", "年假", "病假", "调休", "PTO", "Leave", "Vacation", "Out of Office", "OOO"
+        "PTO", "Leave", "Vacation", "Annual Leave", "Day Off", "Sick Leave"
     ]
 }
 
@@ -82,7 +82,7 @@ public final class SharedAlarmStore: @unchecked Sendable {
             return VibeAlarmSnapshot()
         }
 
-        // Automatically expire stale NextDayOverride if targetDate < today (一键推迟和恢复次日闹钟)
+        // Automatically expire stale NextDayOverride if targetDate < today
         if snapshot.alarmRule.autoRestoreNextDay,
            let override = snapshot.nextDayOverride {
             let todayStr = AlarmScheduleEngine(calendar: calendar).dateString(from: referenceDate)

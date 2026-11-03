@@ -1,14 +1,11 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// Built-in Calendar & Events Manager (`内置日历与事项管理` — Light Theme):
-/// - Interactive Monthly Calendar Grid (`2026年 11月`) showing `休` (Holiday), `班` (Makeup Workday), and `假` (Personal Leave/Event) badges on each day.
-/// - Skeuomorphic Horizontal Roller (`SkeuomorphicHorizontalRoller`) for filtering event types.
-/// - Full CRUD (Add, Edit, Delete) for built-in calendar events, holidays, makeup workdays, and personal leave, plus quick entry to BYOK AI Notice Parsing.
+/// Screen 3 ("Calendar"): Braun/Apple Light Theme built-in calendar & events manager.
+/// Interactive monthly grid with `OFF` / `WRK` / `PTO` micro-pills, a horizontal roller filter,
+/// and full CRUD for holidays, makeup workdays, and personal leave.
 public struct HolidayCalendarView: View {
     @ObservedObject var viewModel: AppViewModel
-    @Environment(\.dismiss) private var dismiss
-    public var isEmbeddedInTab: Bool
 
     @State private var displayedYear: Int = 2026
     @State private var displayedMonth: Int = 11
@@ -17,242 +14,233 @@ public struct HolidayCalendarView: View {
     @State private var eventTitleInput: String = ""
     @State private var eventKindSelection: HolidayEntryKind = .personalLeave
     @State private var editingEntry: HolidayCalendarEntry?
+    @State private var showEditorCard: Bool = false
 
     @State private var filterRollerIndex: Int = 0
     @State private var showBYOKSheet: Bool = false
 
-    private let filterOptions: [String] = [
-        "全部日历事项",
-        "公共假期 (休)",
-        "调休补班 (班)",
-        "个人请假 (假)"
-    ]
+    private let filterOptions: [String] = ["All", "Holidays", "Workdays", "Leave"]
 
-    public init(viewModel: AppViewModel, isEmbeddedInTab: Bool = false) {
+    public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
-        self.isEmbeddedInTab = isEmbeddedInTab
     }
 
     public var body: some View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 12) {
-                    // 1. INTERACTIVE MONTHLY CALENDAR GRID CARD
+                    monthBar
                     monthlyCalendarCard
+                    filterRollerCard
 
-                    // 2. SKEUOMORPHIC HORIZONTAL ROLLER FILTER
-                    VStack(spacing: 6) {
-                        SkeuomorphicHorizontalRoller(
-                            title: "事项筛选",
-                            options: filterOptions,
-                            selectedIndex: filterRollerIndex
-                        ) { newIdx in
-                            filterRollerIndex = newIdx
-                        }
+                    if showEditorCard {
+                        eventEditorCard
                     }
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.04), radius: 5, x: 0, y: 2)
-                    )
 
-                    // 3. ADD / EDIT BUILT-IN CALENDAR EVENT & HOLIDAY CARD
-                    eventEditorCard
-
-                    // 4. BUILT-IN CALENDAR & EVENTS LIST (WITH EDIT & DELETE)
                     eventsListCard
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("内置日历与事项")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showBYOKSheet = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "doc.text.magnifyingglass")
-                            Text("AI 解析通知")
-                        }
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.orange)
-                    }
-                }
-                if !isEmbeddedInTab {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("完成") { dismiss() }
-                            .foregroundStyle(.orange)
-                    }
-                }
-            }
+            .background(Color.vibeCanvas)
+            .navigationBarHidden(true)
             .sheet(isPresented: $showBYOKSheet) {
                 BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
             }
         }
-        .tint(.orange)
+        .tint(.vibeAccent)
         .preferredColorScheme(.light)
     }
 
-    // MARK: - 1. Interactive Monthly Calendar Grid
+    // MARK: - Month Bar
+
+    private var monthBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                shiftMonth(by: -1)
+            } label: {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.vibeAccent)
+            }
+            .buttonStyle(.plain)
+
+            Text("\(Self.monthFullNames[displayedMonth - 1]) \(displayedYear)")
+                .font(.headline.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+
+            Button {
+                shiftMonth(by: 1)
+            } label: {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.vibeAccent)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button {
+                editingEntry = nil
+                eventTitleInput = ""
+                showEditorCard = true
+            } label: {
+                Text("+ Add")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.vibeAccent)
+                    .foregroundStyle(.white)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showBYOKSheet = true
+            } label: {
+                Text("AI Parse")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(uiColor: .systemGray6))
+                    .foregroundStyle(.primary)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - Monthly Calendar Grid
 
     private var monthlyCalendarCard: some View {
-        VStack(spacing: 10) {
-            // Month Header + Legend
-            HStack {
-                Button {
-                    shiftMonth(by: -1)
-                } label: {
-                    Image(systemName: "chevron.left.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.orange)
-                }
-                .buttonStyle(.plain)
-
-                Text(String(format: "%04d年 %02d月", displayedYear, displayedMonth))
-                    .font(.headline.weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(.primary)
-
-                Button {
-                    shiftMonth(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.orange)
-                }
-                .buttonStyle(.plain)
-
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                legendDot(label: "Holiday", color: .vibeAccent)
+                legendDot(label: "Workday", color: .vibeWork)
+                legendDot(label: "Leave", color: .vibePTO)
                 Spacer()
-
-                // Mini Legend for 休 / 班 / 假
-                HStack(spacing: 8) {
-                    legendDot(label: "公休", color: .red)
-                    legendDot(label: "补班", color: .blue)
-                    legendDot(label: "请假", color: .green)
-                }
             }
 
-            // Weekday Header Row
-            let weekdays = ["日", "一", "二", "三", "四", "五", "六"]
             HStack(spacing: 0) {
-                ForEach(weekdays, id: \.self) { wd in
-                    Text(wd)
+                ForEach(Array(Self.weekdayHeaders.enumerated()), id: \.offset) { idx, label in
+                    Text(label)
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(wd == "日" || wd == "六" ? Color.orange : Color.secondary)
+                        .foregroundStyle(idx >= 5 ? Color.vibeAccent : Color.secondary)
                         .frame(maxWidth: .infinity)
                 }
             }
 
-            // Calendar Days Grid
             let cells = buildMonthCells(year: displayedYear, month: displayedMonth)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 6) {
                 ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
                     if let dayNum = cell.day, let dateStr = cell.dateString {
-                        let matched = entriesForDate(dateStr)
-                        let isSelected = dateStr == selectedDateString
-                        let isToday = dateStr == viewModel.todayAlarm.date
-
-                        Button {
-                            selectedDateString = dateStr
-                            if let first = matched.first {
-                                editingEntry = first
-                                eventTitleInput = first.title
-                                eventKindSelection = first.kind
-                            } else {
-                                editingEntry = nil
-                            }
-                        } label: {
-                            VStack(spacing: 2) {
-                                Text("\(dayNum)")
-                                    .font(.system(size: 14, weight: isSelected || isToday ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(
-                                        isSelected
-                                            ? Color.white
-                                            : (isToday ? Color.orange : Color.primary)
-                                    )
-
-                                if let primaryEntry = matched.first {
-                                    Text(badgeText(for: primaryEntry.kind))
-                                        .font(.system(size: 9, weight: .bold))
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 1)
-                                        .background(
-                                            Capsule()
-                                                .fill( isSelected ? Color.white.opacity(0.25) : badgeColor(for: primaryEntry.kind).opacity(0.15) )
-                                        )
-                                        .foregroundStyle(isSelected ? Color.white : badgeColor(for: primaryEntry.kind))
-                                } else {
-                                    Text("·")
-                                        .font(.system(size: 9))
-                                        .foregroundStyle(.clear)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 40)
-                            .background(
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .fill(isSelected ? Color.orange : (isToday ? Color.orange.opacity(0.10) : Color(uiColor: .systemGray6).opacity(0.55)))
-                            )
-                        }
-                        .buttonStyle(.plain)
+                        dayCell(dayNum: dayNum, dateStr: dateStr)
                     } else {
-                        Color.clear
-                            .frame(height: 40)
+                        Color.clear.frame(height: 42)
                     }
                 }
             }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-        )
+        .padding(14)
+        .vibeCard()
     }
 
-    // MARK: - 3. Add / Edit Event Card (管理内置日历与事项 CRUD)
+    private func dayCell(dayNum: Int, dateStr: String) -> some View {
+        let matched = entriesForDate(dateStr)
+        let isSelected = dateStr == selectedDateString
+        let isToday = dateStr == viewModel.todayAlarm.date
+
+        return Button {
+            selectedDateString = dateStr
+            if let first = matched.first {
+                editingEntry = first
+                eventTitleInput = first.title
+                eventKindSelection = first.kind
+            } else {
+                editingEntry = nil
+                eventTitleInput = ""
+                eventKindSelection = .personalLeave
+            }
+            showEditorCard = true
+        } label: {
+            VStack(spacing: 2) {
+                Text("\(dayNum)")
+                    .font(.system(size: 14, weight: isSelected || isToday ? .bold : .medium, design: .rounded))
+                    .foregroundStyle(
+                        isSelected
+                            ? Color.white
+                            : (isToday ? Color.vibeAccent : Color.primary)
+                    )
+
+                if let primaryEntry = matched.first {
+                    Text(primaryEntry.kind.shortBadge)
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? Color.white.opacity(0.25) : badgeColor(for: primaryEntry.kind).opacity(0.15))
+                        )
+                        .foregroundStyle(isSelected ? Color.white : badgeColor(for: primaryEntry.kind))
+                } else {
+                    Text(" ")
+                        .font(.system(size: 9))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isSelected ? Color.vibeAccent : (isToday ? Color.vibeAccent.opacity(0.10) : Color(uiColor: .systemGray6).opacity(0.5)))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Filter Roller
+
+    private var filterRollerCard: some View {
+        SkeuomorphicHorizontalRoller(
+            title: "FILTER",
+            options: filterOptions,
+            selectedIndex: filterRollerIndex
+        ) { newIdx in
+            filterRollerIndex = newIdx
+        }
+        .padding(10)
+        .vibeCard()
+    }
+
+    // MARK: - Add / Edit Event Card
 
     private var eventEditorCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label(
-                    editingEntry == nil ? "新增内置日历事项 / 假期 / 调休" : "编辑事项 (\(selectedDateString))",
-                    systemImage: editingEntry == nil ? "calendar.badge.plus" : "pencil.circle.fill"
-                )
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text("选中日期: \(selectedDateString)")
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.orange)
-            }
-
-            HStack(spacing: 8) {
-                TextField("输入事项名称（如：个人年假、春节调休补班）", text: $eventTitleInput)
-                    .font(.subheadline)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(Color(uiColor: .systemGray6))
-                    )
-
-                if editingEntry != nil {
-                    Button("取消编辑") {
-                        editingEntry = nil
-                        eventTitleInput = ""
-                    }
-                    .font(.caption)
+                Text(editingEntry == nil ? "New Entry · \(selectedDateString)" : "Edit Entry · \(selectedDateString)")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showEditorCard = false
+                    editingEntry = nil
+                    eventTitleInput = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
             }
+
+            TextField("Event name (e.g. Annual Leave)", text: $eventTitleInput)
+                .font(.subheadline)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Color(uiColor: .systemGray6))
+                )
 
             HStack(spacing: 8) {
                 ForEach(HolidayEntryKind.allCases, id: \.self) { kind in
@@ -285,7 +273,6 @@ public struct HolidayCalendarView: View {
                             newTitle: finalTitle,
                             newKind: eventKindSelection
                         )
-                        editingEntry = nil
                     } else {
                         viewModel.addManualHolidayEntry(
                             date: selectedDateString,
@@ -293,123 +280,116 @@ public struct HolidayCalendarView: View {
                             kind: eventKindSelection
                         )
                     }
+                    showEditorCard = false
+                    editingEntry = nil
                     eventTitleInput = ""
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: editingEntry == nil ? "plus.circle.fill" : "checkmark.circle.fill")
-                        Text(editingEntry == nil ? "保存至内置日历" : "更新事项")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .background(Color.orange)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    Text(editingEntry == nil ? "Save" : "Update")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(Color.vibeAccent)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
-                Button {
-                    showBYOKSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                        Text("粘贴放假通知解析")
+                if let existing = editingEntry {
+                    Button {
+                        viewModel.deleteHolidayEntry(existing)
+                        showEditorCard = false
+                        editingEntry = nil
+                        eventTitleInput = ""
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(Color.red.opacity(0.10))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
-                    .font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(Color.orange.opacity(0.14))
-                    .foregroundStyle(.orange)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-        )
+        .padding(14)
+        .vibeCard()
     }
 
-    // MARK: - 4. Filtered Built-in Calendar & Events List
+    // MARK: - Entries List
 
     private var eventsListCard: some View {
         let items = filteredEntries
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("已管理的日历事项与调休记录 (\(items.count))")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("点击可编辑或删除")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("THIS MONTH · \(items.count)")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 4)
 
-            ForEach(items) { entry in
-                HStack(spacing: 10) {
-                    Text(entry.kind.shortBadge)
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(badgeColor(for: entry.kind).opacity(0.14))
-                        )
-                        .foregroundStyle(badgeColor(for: entry.kind))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.title)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.primary)
-                        Text("\(entry.date) · \(entry.source.displayName)")
-                            .font(.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 {
+                        Divider()
                     }
-
-                    Spacer()
-
-                    Button {
-                        selectedDateString = entry.date
-                        editingEntry = entry
-                        eventTitleInput = entry.title
-                        eventKindSelection = entry.kind
-                    } label: {
-                        Text("编辑")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 8)
+                    HStack(spacing: 10) {
+                        Text(entry.kind.shortBadge)
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 7)
                             .padding(.vertical, 4)
-                            .background(Color.orange.opacity(0.12))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(badgeColor(for: entry.kind).opacity(0.14))
+                            )
+                            .foregroundStyle(badgeColor(for: entry.kind))
 
-                    Button {
-                        viewModel.deleteHolidayEntry(entry)
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .padding(6)
-                            .background(Color.red.opacity(0.10))
-                            .clipShape(Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.title)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            Text(entry.date)
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button {
+                            selectedDateString = entry.date
+                            editingEntry = entry
+                            eventTitleInput = entry.title
+                            eventKindSelection = entry.kind
+                            showEditorCard = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.caption)
+                                .foregroundStyle(.vibeAccent)
+                                .padding(6)
+                                .background(Color.vibeAccent.opacity(0.10))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            viewModel.deleteHolidayEntry(entry)
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .padding(6)
+                                .background(Color.red.opacity(0.10))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, 8)
                 }
-                .padding(.vertical, 6)
-                Divider()
             }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: 2)
-        )
+        .padding(14)
+        .vibeCard()
     }
 
     // MARK: - Helpers
@@ -438,19 +418,11 @@ public struct HolidayCalendarView: View {
         viewModel.snapshot.holidayEntries.filter { $0.date == dateStr }
     }
 
-    private func badgeText(for kind: HolidayEntryKind) -> String {
-        switch kind {
-        case .publicHoliday: return "休"
-        case .makeupWorkday: return "班"
-        case .personalLeave: return "假"
-        }
-    }
-
     private func badgeColor(for kind: HolidayEntryKind) -> Color {
         switch kind {
-        case .publicHoliday: return .red
-        case .makeupWorkday: return .blue
-        case .personalLeave: return .green
+        case .publicHoliday: return .vibeAccent
+        case .makeupWorkday: return .vibeWork
+        case .personalLeave: return .vibePTO
         }
     }
 
@@ -479,6 +451,13 @@ public struct HolidayCalendarView: View {
         displayedYear = y
     }
 
+    private static let weekdayHeaders = ["M", "T", "W", "T", "F", "S", "S"]
+
+    private static let monthFullNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ]
+
     private struct MonthDayCell {
         let day: Int?
         let dateString: String?
@@ -486,7 +465,7 @@ public struct HolidayCalendarView: View {
 
     private func buildMonthCells(year: Int, month: Int) -> [MonthDayCell] {
         var cal = Calendar(identifier: .gregorian)
-        cal.firstWeekday = 1 // Sunday
+        cal.firstWeekday = 2 // Monday, to match the "M T W T F S S" header
         var comps = DateComponents()
         comps.year = year
         comps.month = month
@@ -495,8 +474,8 @@ public struct HolidayCalendarView: View {
               let range = cal.range(of: .day, in: .month, for: firstOfMonth) else {
             return []
         }
-        let weekdayOfFirst = cal.component(.weekday, from: firstOfMonth) // 1..7
-        let leadingEmpty = weekdayOfFirst - 1
+        let weekdayOfFirst = cal.component(.weekday, from: firstOfMonth) // 1 (Sun) ... 7 (Sat)
+        let leadingEmpty = (weekdayOfFirst - cal.firstWeekday + 7) % 7
 
         var cells: [MonthDayCell] = []
         for _ in 0..<leadingEmpty {
