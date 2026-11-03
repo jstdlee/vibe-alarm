@@ -4,11 +4,7 @@
 
 [![CI](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml/badge.svg)](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml)
 ![iOS 17.0+](https://img.shields.io/badge/iOS-17.0%2B-F5F5F7?logo=apple&logoColor=black)
-![Swift 6 / SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%C2%B7%20WidgetKit-FF5500?logo=swift)
-
-<p align="center">
-  <img src="docs/screenshots/hero-overview.png" width="100%" alt="VibeAlarm iOS Simulator Light Theme Overview">
-</p>
+![SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%C2%B7%20WidgetKit-FF5500?logo=swift)
 
 > **Design principles**: native `List`/`Form` with the `.insetGrouped` style, system semantic colors (`Color(.systemGroupedBackground)`, `.primary`, `.secondary`), and exactly one accent color (system orange). No gradients, no badges, no decorative chrome.
 > - **Two skeuomorphic controls, and only two**: a pair of semicircular rotary dials (`SemicircleDial`) anchored to the left and right screen edges for picking the hour and minute, and horizontal thumbwheel rollers (`ThumbwheelRoller`) that replace dropdown menus for repeat mode and holiday policy.
@@ -22,10 +18,10 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
 
 <p align="center">
   <img src="docs/screenshots/01-two-day-dashboard.png" width="19%" alt="Two-Day Dashboard">
-  <img src="docs/screenshots/02-dual-thumb-dial.png" width="19%" alt="Dual-Thumb Time Dial">
+  <img src="docs/screenshots/02-dual-thumb-dial.png" width="19%" alt="Wake Time Editor">
   <img src="docs/screenshots/03-builtin-calendar-events.png" width="19%" alt="Built-in Calendar & Events">
   <img src="docs/screenshots/04-external-and-ios-calendar-settings.png" width="19%" alt="External & iOS Calendar Settings">
-  <img src="docs/screenshots/05-widgets-and-byok.png" width="19%" alt="Widgets, Bedtime Notification & BYOK AI">
+  <img src="docs/screenshots/05-widgets-and-byok.png" width="19%" alt="Home Screen Widgets">
 </p>
 
 | 1. Alarm (`TwoDayDashboardView`) | 2. Wake Time (`TimeEditorView`) |
