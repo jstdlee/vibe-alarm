@@ -97,9 +97,17 @@ jobs:
               xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode" || true
               sleep 8
               if app_running; then
+                # Let the first frame render; the Intel simulator can show the blank launch screen for several seconds.
+                sleep 10
                 xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
-                echo "Captured $out (attempt $attempt)"
-                return 0
+                local size
+                size=$(stat -f%z "dist/screenshots/$out")
+                if [ "$size" -gt 100000 ]; then
+                  echo "Captured $out (attempt $attempt, $size bytes)"
+                  return 0
+                fi
+                echo "::warning::Screenshot for $mode looks blank ($size bytes), retrying (attempt $attempt)"
+                continue
               fi
               echo "::warning::VibeAlarm not running for mode $mode (attempt $attempt)"
             done
