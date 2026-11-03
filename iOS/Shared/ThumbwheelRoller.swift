@@ -27,7 +27,7 @@ public struct ThumbwheelRoller: View {
     }
 
     public var body: some View {
-        GeometryReader { geo in
+        GeometryReader { _ in
             let centerIndex = effectiveCenterIndex
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -45,7 +45,8 @@ public struct ThumbwheelRoller: View {
                             .frame(width: slotWidth)
                     }
                 }
-                .offset(x: baseOffsetX(containerWidth: geo.size.width) + dragTranslation)
+                .fixedSize()
+                .offset(x: baseOffsetX() + dragTranslation)
 
                 centerHairline
 
@@ -81,8 +82,10 @@ public struct ThumbwheelRoller: View {
         CGFloat(selectedIndex) - dragTranslation / slotWidth
     }
 
-    private func baseOffsetX(containerWidth: CGFloat) -> CGFloat {
-        containerWidth / 2 - (CGFloat(selectedIndex) + 0.5) * slotWidth
+    /// The HStack is centered in the ZStack, so shift it so the selected slot's center
+    /// lands on the container's center line.
+    private func baseOffsetX() -> CGFloat {
+        (CGFloat(options.count) / 2 - CGFloat(selectedIndex) - 0.5) * slotWidth
     }
 
     private func slotLabel(text: String, idx: Int, centerIndex: CGFloat) -> some View {

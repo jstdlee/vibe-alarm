@@ -35,8 +35,13 @@ public struct TwoDayDashboardView: View {
                             Spacer()
                             Text(viewModel.snapshot.alarmRule.formattedBaseTime)
                                 .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
                         }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
 
                     Toggle(isOn: bedtimeEnabledBinding) {
                         Text("Bedtime reminder")

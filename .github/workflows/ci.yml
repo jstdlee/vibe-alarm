@@ -58,6 +58,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO | xcbeautify
 
       - name: Capture real iOS Simulator screenshots (Light Theme)
+        id: screenshots
         run: |
           set -euo pipefail
           mkdir -p dist/screenshots
@@ -78,29 +79,43 @@ jobs:
           echo "Installing $APP_PATH on simulator $SIM_UDID"
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
 
+          app_running() {
+            xcrun simctl spawn "$SIM_UDID" launchctl list 2>/dev/null | grep -q "UIKitApplication:com.jstdlee.vibealarm"
+          }
+
           capture_screen() {
             local mode="$1"
             local out="$2"
-            for attempt in 1 2 3; do
+            for attempt in 1 2 3 4; do
               xcrun simctl terminate "$SIM_UDID" com.jstdlee.vibealarm || true
-              sleep 1
-              xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode"
-              sleep 4
-              xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
-              local sz=$(stat -f%z "dist/screenshots/$out" 2>/dev/null || echo 0)
-              echo "Captured $out (attempt $attempt, size=${sz}B)"
-              if [ "$sz" -gt 120000 ]; then
-                break
+              sleep 2
+              xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode" || true
+              sleep 5
+              if app_running; then
+                xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
+                echo "Captured $out (attempt $attempt)"
+                return 0
               fi
+              echo "::warning::VibeAlarm not running for mode $mode (attempt $attempt)"
             done
+            echo "::error::Could not capture $mode: app is not running (crash?)"
+            CAPTURE_FAILED=1
           }
 
+          CAPTURE_FAILED=0
           capture_screen "dashboard" "01-two-day-dashboard.png"
           capture_screen "dial" "02-dual-thumb-dial.png"
           capture_screen "calendar" "03-builtin-calendar-events.png"
           capture_screen "settings" "04-external-and-ios-calendar-settings.png"
           capture_screen "widget" "05-widgets-and-byok.png"
           ls -lh dist/screenshots/
+          mkdir -p dist/crashes
+          cp ~/Library/Logs/DiagnosticReports/*VibeAlarm* dist/crashes/ 2>/dev/null || true
+          ls -l dist/crashes/
+          if [ "$CAPTURE_FAILED" != "0" ]; then
+            for f in dist/crashes/*; do [ -f "$f" ] && head -c 6000 "$f"; done
+            exit 1
+          fi
 
       - name: Build for device & package unsigned IPA
         run: |
@@ -123,5 +138,6 @@ jobs:
             dist/VibeAlarm.ipa
             dist/VibeAlarm.ipa.sha256
             dist/screenshots/*.png
+            dist/crashes/*
             build/*.xcresult
           if-no-files-found: error
