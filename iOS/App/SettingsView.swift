@@ -26,6 +26,8 @@ public struct SettingsView: View {
                 byokSection
                 privacySection
             }
+            // Keep the last rows clear of the floating tab bar.
+            .contentMargins(.bottom, 96, for: .scrollContent)
             .navigationTitle("Sources")
             .onAppear {
                 loadInitialState()

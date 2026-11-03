@@ -34,6 +34,26 @@ func widgetShortReason(_ day: ResolvedDayAlarm) -> String? {
 
 // MARK: - Small Widget (Tomorrow Only)
 
+/// Skip and delay only make sense when tomorrow will actually ring and has no override yet.
+func widgetCanAdjustTomorrow(_ day: ResolvedDayAlarm) -> Bool {
+    day.status.isRinging && !day.hasManualOverride
+}
+
+/// Non-interactive placeholder that matches the bordered button shape, shown when an action does not apply.
+struct WidgetInactivePill: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.body)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(Color.secondary.opacity(0.12)))
+            .accessibilityLabel("\(title), unavailable")
+    }
+}
+
 public struct SmallWidgetContentView: View {
     public let tomorrow: ResolvedDayAlarm
 
@@ -70,13 +90,15 @@ public struct SmallWidgetContentView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.vibeAccent)
-            } else {
+            } else if widgetCanAdjustTomorrow(tomorrow) {
                 Button(intent: SkipTomorrowIntent()) {
                     Text("Skip")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(.vibeAccent)
+            } else {
+                WidgetInactivePill(title: "Skip")
             }
         }
     }
@@ -101,23 +123,32 @@ public struct MediumWidgetContentView: View {
             }
 
             HStack(spacing: 8) {
-                Button(intent: SkipTomorrowIntent()) {
-                    Text("Skip").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
+                if widgetCanAdjustTomorrow(tomorrow) {
+                    Button(intent: SkipTomorrowIntent()) {
+                        Text("Skip").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.vibeAccent)
 
-                Button(intent: DelayTomorrow30Intent()) {
-                    Text("+30 min").frame(maxWidth: .infinity)
+                    Button(intent: DelayTomorrow30Intent()) {
+                        Text("+30 min").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.vibeAccent)
+                } else {
+                    WidgetInactivePill(title: "Skip")
+                    WidgetInactivePill(title: "+30 min")
                 }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
 
-                Button(intent: RestoreTomorrowIntent()) {
-                    Text("Restore").frame(maxWidth: .infinity)
+                if tomorrow.hasManualOverride {
+                    Button(intent: RestoreTomorrowIntent()) {
+                        Text("Restore").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.vibeAccent)
+                } else {
+                    WidgetInactivePill(title: "Restore")
                 }
-                .buttonStyle(.bordered)
-                .tint(tomorrow.hasManualOverride ? .vibeAccent : .secondary)
             }
         }
     }

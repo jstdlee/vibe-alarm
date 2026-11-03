@@ -43,6 +43,8 @@ public struct HolidayCalendarView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            // Keep the last rows clear of the floating tab bar.
+            .contentMargins(.bottom, 96, for: .scrollContent)
             .navigationTitle("Calendar")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
