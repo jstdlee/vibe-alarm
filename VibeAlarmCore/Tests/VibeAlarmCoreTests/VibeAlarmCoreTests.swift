@@ -248,4 +248,59 @@ final class VibeAlarmCoreTests: XCTestCase {
         let loadedWednesday = store.load(referenceDate: wednesday, calendar: calendar)
         XCTAssertNil(loadedWednesday.nextDayOverride)
     }
+
+    // MARK: - Snooze Interval Tests
+
+    func testDefaultSnoozeMinutesIsEight() {
+        XCTAssertEqual(AlarmRule().snoozeMinutes, 8)
+        XCTAssertEqual(AlarmRule.snoozeIntervalOptions, [5, 8, 10, 15, 20])
+    }
+
+    func testAlarmRuleDecodesMissingSnoozeMinutesAsEight() throws {
+        // Encode a rule, strip the new key, and ensure legacy JSON still decodes.
+        let rule = AlarmRule(hour: 6, minute: 0, repeatMode: .weekdays)
+        let data = try JSONEncoder().encode(rule)
+        var dict = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        dict.removeValue(forKey: "snoozeMinutes")
+        XCTAssertNil(dict["snoozeMinutes"])
+        let strippedData = try JSONSerialization.data(withJSONObject: dict)
+        let decoded = try JSONDecoder().decode(AlarmRule.self, from: strippedData)
+        XCTAssertEqual(decoded.snoozeMinutes, 8)
+    }
+
+    func testSnoozeMinutesNormalizationSnapsToNearestOption() {
+        XCTAssertEqual(AlarmRule.normalizedSnoozeMinutes(7), 8)
+        XCTAssertEqual(AlarmRule.normalizedSnoozeMinutes(100), 20)
+        XCTAssertEqual(AlarmRule.normalizedSnoozeMinutes(0), 8)
+        XCTAssertEqual(AlarmRule.normalizedSnoozeMinutes(-5), 8)
+        XCTAssertEqual(AlarmRule.normalizedSnoozeMinutes(5), 5)
+        XCTAssertEqual(AlarmRule.normalizedSnoozeMinutes(15), 15)
+        // The initializer also normalizes out-of-list values.
+        XCTAssertEqual(AlarmRule(snoozeMinutes: 7).snoozeMinutes, 8)
+        XCTAssertEqual(AlarmRule(snoozeMinutes: 0).snoozeMinutes, 8)
+    }
+
+    func testSharedAlarmStoreSnoozeMinutesRoundTrip() throws {
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("vibe-test-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let store = SharedAlarmStore(fileURL: tempURL)
+        _ = try store.setSnoozeMinutes(15)
+        XCTAssertEqual(store.load().alarmRule.snoozeMinutes, 15)
+
+        // A non-option value is normalized to the nearest option through the setter.
+        _ = try store.setSnoozeMinutes(7)
+        XCTAssertEqual(store.load().alarmRule.snoozeMinutes, 8)
+    }
+
+    func testSnoozeFireDateAddsExactlyConfiguredMinutes() throws {
+        let base = try XCTUnwrap(engine.date(from: "2026-10-26"))
+
+        let fire = engine.snoozeFireDate(after: base, rule: AlarmRule(snoozeMinutes: 10))
+        XCTAssertEqual(fire.timeIntervalSince(base), 10 * 60, accuracy: 0.5)
+
+        let defaultFire = engine.snoozeFireDate(after: base, rule: AlarmRule())
+        XCTAssertEqual(defaultFire.timeIntervalSince(base), 8 * 60, accuracy: 0.5)
+    }
 }

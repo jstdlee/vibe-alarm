@@ -8,8 +8,13 @@ import VibeAlarmCore
 /// 2. Multi-burst Time-Sensitive wake-up alarm notifications for Today & Tomorrow.
 public enum AlarmNotificationScheduler {
     private static let notificationPrefix = "com.jstdlee.vibealarm.scheduled."
+    /// Stable identifier prefix for one-off snooze wake notifications (replaced on each snooze).
+    public static let snoozeNotificationPrefix = "vibealarm.snooze."
 
-    public static func registerNotificationCategories() {
+    /// Registers notification categories. The wake category embeds the current snooze interval in
+    /// its action title (e.g. "Snooze 8 min"); because UNNotificationAction titles are fixed once
+    /// registered, callers must re-register whenever the snooze value changes.
+    public static func registerNotificationCategories(snoozeMinutes: Int = 8) {
         let skipAction = UNNotificationAction(
             identifier: AppConstants.actionSkipTomorrow,
             title: "Skip Tomorrow (Auto-Restores)",
@@ -35,6 +40,11 @@ public enum AlarmNotificationScheduler {
             title: "Keep Tomorrow's Alarm On",
             options: []
         )
+        let snoozeAction = UNNotificationAction(
+            identifier: AppConstants.actionSnooze,
+            title: "Snooze \(AlarmRule.normalizedSnoozeMinutes(snoozeMinutes)) min",
+            options: []
+        )
 
         let bedtimeCategory = UNNotificationCategory(
             identifier: AppConstants.bedtimeCategoryIdentifier,
@@ -45,7 +55,7 @@ public enum AlarmNotificationScheduler {
 
         let wakeCategory = UNNotificationCategory(
             identifier: AppConstants.wakeAlarmCategoryIdentifier,
-            actions: [delay30Action, restoreAction],
+            actions: [snoozeAction, delay30Action, restoreAction],
             intentIdentifiers: [],
             options: [.customDismissAction]
         )
@@ -150,5 +160,38 @@ public enum AlarmNotificationScheduler {
                 try? await center.add(req)
             }
         }
+    }
+
+    /// Schedules a one-off wake notification `rule.snoozeMinutes` minutes after `referenceDate`,
+    /// reusing the wake alarm category. Any previously pending snooze is replaced first.
+    public static func scheduleSnooze(referenceDate: Date = Date()) async {
+        let store = SharedAlarmStore(appGroupID: AppConstants.appGroupID)
+        let snapshot = store.load(referenceDate: referenceDate)
+        let rule = snapshot.alarmRule
+        let calendar = AlarmScheduleEngine.defaultCalendar()
+        let engine = AlarmScheduleEngine(calendar: calendar)
+        let fireDate = engine.snoozeFireDate(after: referenceDate, rule: rule)
+
+        let center = UNUserNotificationCenter.current()
+        let pending = await center.pendingNotificationRequests()
+        let existingIDs = pending.map(\.identifier).filter { $0.hasPrefix(snoozeNotificationPrefix) }
+        if !existingIDs.isEmpty {
+            center.removePendingNotificationRequests(withIdentifiers: existingIDs)
+        }
+
+        let minutes = AlarmRule.normalizedSnoozeMinutes(rule.snoozeMinutes)
+        let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
+        let content = UNMutableNotificationContent()
+        content.title = "⏰ \(rule.label) · Snoozed \(minutes) min"
+        content.subtitle = "Snooze alarm"
+        content.body = "Long-press this notification to delay by 30 minutes."
+        content.sound = .defaultCritical
+        content.categoryIdentifier = AppConstants.wakeAlarmCategoryIdentifier
+        content.interruptionLevel = .timeSensitive
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let reqID = "\(snoozeNotificationPrefix)pending"
+        let req = UNNotificationRequest(identifier: reqID, content: content, trigger: trigger)
+        try? await center.add(req)
     }
 }

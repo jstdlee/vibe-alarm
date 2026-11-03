@@ -171,6 +171,21 @@ public final class AppViewModel: ObservableObject {
         applySnapshot(copy)
     }
 
+    // MARK: - Snooze Interval
+
+    public var snoozeMinutes: Int {
+        snapshot.alarmRule.snoozeMinutes
+    }
+
+    public func setSnoozeMinutes(_ minutes: Int) {
+        let normalized = AlarmRule.normalizedSnoozeMinutes(minutes)
+        var copy = snapshot
+        copy.alarmRule.snoozeMinutes = normalized
+        applySnapshot(copy)
+        // Action titles are fixed at registration time, so re-register whenever the value changes.
+        AlarmNotificationScheduler.registerNotificationCategories(snoozeMinutes: normalized)
+    }
+
     // MARK: - Next-Day One-Tap Quick Actions
 
     public func performTomorrowOverride(_ action: NextDayOverrideAction) {
@@ -388,7 +403,7 @@ public final class AppViewModel: ObservableObject {
     public func requestNotificationPermissionIfNeeded() async {
         let center = UNUserNotificationCenter.current()
         _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-        AlarmNotificationScheduler.registerNotificationCategories()
+        AlarmNotificationScheduler.registerNotificationCategories(snoozeMinutes: snapshot.alarmRule.snoozeMinutes)
         await AlarmNotificationScheduler.syncNotifications(for: snapshot)
     }
 

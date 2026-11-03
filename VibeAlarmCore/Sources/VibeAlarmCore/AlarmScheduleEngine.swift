@@ -497,6 +497,14 @@ public struct AlarmScheduleEngine: Sendable {
         return monthAbbreviations[month - 1]
     }
 
+    /// Pure computation of the next fire date when the user snoozes, adding the rule's
+    /// normalized snooze interval (in minutes) to the supplied fire/now date.
+    public func snoozeFireDate(after date: Date, rule: AlarmRule) -> Date {
+        let minutes = AlarmRule.normalizedSnoozeMinutes(rule.snoozeMinutes)
+        return calendar.date(byAdding: .minute, value: minutes, to: date)
+            ?? date.addingTimeInterval(TimeInterval(minutes * 60))
+    }
+
     public static func addMinutes(hour: Int, minute: Int, delta: Int) -> (hour: Int, minute: Int) {
         let total = ((hour * 60 + minute + delta) % 1440 + 1440) % 1440
         return (total / 60, total % 60)

@@ -27,4 +27,5 @@ public enum AppConstants {
     public static let actionDelay60m = "VIBE_ACTION_DELAY_60M"
     public static let actionRestoreTomorrow = "VIBE_ACTION_RESTORE_TOMORROW"
     public static let actionKeepTomorrow = "VIBE_ACTION_KEEP_TOMORROW"
+    public static let actionSnooze = "VIBE_ACTION_SNOOZE"
 }

@@ -109,6 +109,8 @@ public struct AlarmRule: Codable, Identifiable, Equatable, Sendable {
     /// Minutes since midnight (0...1439) for the pre-bedtime reminder notification (e.g. 22 * 60 + 30 = 22:30).
     public var preBedtimeReminderMinutes: Int
     public var bedtimeReminderEnabled: Bool
+    /// Snooze interval in minutes applied when the user taps the wake notification's "Snooze" action. Default 8.
+    public var snoozeMinutes: Int
 
     public init(
         id: UUID = UUID(),
@@ -121,7 +123,8 @@ public struct AlarmRule: Codable, Identifiable, Equatable, Sendable {
         skipPersonalLeave: Bool = true,
         autoRestoreNextDay: Bool = true,
         preBedtimeReminderMinutes: Int = 22 * 60 + 30,
-        bedtimeReminderEnabled: Bool = true
+        bedtimeReminderEnabled: Bool = true,
+        snoozeMinutes: Int = 8
     ) {
         self.id = id
         self.label = label
@@ -134,6 +137,55 @@ public struct AlarmRule: Codable, Identifiable, Equatable, Sendable {
         self.autoRestoreNextDay = autoRestoreNextDay
         self.preBedtimeReminderMinutes = max(0, min(1439, preBedtimeReminderMinutes))
         self.bedtimeReminderEnabled = bedtimeReminderEnabled
+        self.snoozeMinutes = AlarmRule.normalizedSnoozeMinutes(snoozeMinutes)
+    }
+
+    // MARK: - Snooze Interval
+
+    /// Selectable snooze interval options presented in the UI (minutes).
+    public static let snoozeIntervalOptions: [Int] = [5, 8, 10, 15, 20]
+
+    /// Normalizes an arbitrary snooze value: non-positive values fall back to 8,
+    /// values already in `snoozeIntervalOptions` pass through, and any other value
+    /// snaps to the nearest option (e.g. 7 -> 8, 100 -> 20, 0 -> 8).
+    public static func normalizedSnoozeMinutes(_ value: Int) -> Int {
+        guard value > 0 else { return 8 }
+        if snoozeIntervalOptions.contains(value) { return value }
+        var best = snoozeIntervalOptions[0]
+        var bestDistance = abs(value - best)
+        for option in snoozeIntervalOptions.dropFirst() {
+            let distance = abs(value - option)
+            if distance < bestDistance {
+                best = option
+                bestDistance = distance
+            }
+        }
+        return best
+    }
+
+    // MARK: - Codable (backward-compatible decoding of new keys)
+
+    private enum CodingKeys: String, CodingKey {
+        case id, label, hour, minute, isEnabled, repeatMode
+        case skipPublicHolidays, skipPersonalLeave, autoRestoreNextDay
+        case preBedtimeReminderMinutes, bedtimeReminderEnabled, snoozeMinutes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        hour = try container.decode(Int.self, forKey: .hour)
+        minute = try container.decode(Int.self, forKey: .minute)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        repeatMode = try container.decode(AlarmRepeatMode.self, forKey: .repeatMode)
+        skipPublicHolidays = try container.decode(Bool.self, forKey: .skipPublicHolidays)
+        skipPersonalLeave = try container.decode(Bool.self, forKey: .skipPersonalLeave)
+        autoRestoreNextDay = try container.decode(Bool.self, forKey: .autoRestoreNextDay)
+        preBedtimeReminderMinutes = try container.decode(Int.self, forKey: .preBedtimeReminderMinutes)
+        bedtimeReminderEnabled = try container.decode(Bool.self, forKey: .bedtimeReminderEnabled)
+        let rawSnooze = try container.decodeIfPresent(Int.self, forKey: .snoozeMinutes) ?? 8
+        snoozeMinutes = AlarmRule.normalizedSnoozeMinutes(rawSnooze)
     }
 
     public var formattedBaseTime: String {

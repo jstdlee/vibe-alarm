@@ -141,6 +141,13 @@ public final class SharedAlarmStore: @unchecked Sendable {
     }
 
     @discardableResult
+    public func setSnoozeMinutes(_ minutes: Int) throws -> VibeAlarmSnapshot {
+        try mutate { snapshot in
+            snapshot.alarmRule.snoozeMinutes = AlarmRule.normalizedSnoozeMinutes(minutes)
+        }
+    }
+
+    @discardableResult
     public func upsertHolidayEntries(_ newEntries: [HolidayCalendarEntry], replacingSource sourceToReplace: HolidayEntrySource? = nil) throws -> VibeAlarmSnapshot {
         try mutate { snapshot in
             if let src = sourceToReplace {

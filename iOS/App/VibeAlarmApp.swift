@@ -110,7 +110,8 @@ final class VibeAlarmNotificationDelegate: NSObject, UIApplicationDelegate, UNUs
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        AlarmNotificationScheduler.registerNotificationCategories()
+        let snapshot = SharedAlarmStore(appGroupID: AppConstants.appGroupID).load()
+        AlarmNotificationScheduler.registerNotificationCategories(snoozeMinutes: snapshot.alarmRule.snoozeMinutes)
         return true
     }
 
@@ -127,6 +128,8 @@ final class VibeAlarmNotificationDelegate: NSObject, UIApplicationDelegate, UNUs
     ) async {
         let store = SharedAlarmStore(appGroupID: AppConstants.appGroupID)
         switch response.actionIdentifier {
+        case AppConstants.actionSnooze:
+            await AlarmNotificationScheduler.scheduleSnooze()
         case AppConstants.actionSkipTomorrow:
             _ = try? store.setTomorrowOverride(action: .skipTomorrow)
         case AppConstants.actionDelay30m:
