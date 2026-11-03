@@ -80,7 +80,12 @@ jobs:
           xcrun simctl install "$SIM_UDID" "$APP_PATH"
 
           app_running() {
-            xcrun simctl spawn "$SIM_UDID" launchctl list 2>/dev/null | grep -q "UIKitApplication:com.jstdlee.vibealarm"
+            local services
+            services="$(xcrun simctl spawn "$SIM_UDID" launchctl list 2>/dev/null || true)"
+            case "$services" in
+              *"UIKitApplication:com.jstdlee.vibealarm"*) return 0 ;;
+              *) return 1 ;;
+            esac
           }
 
           capture_screen() {
@@ -90,7 +95,7 @@ jobs:
               xcrun simctl terminate "$SIM_UDID" com.jstdlee.vibealarm || true
               sleep 2
               xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode" || true
-              sleep 5
+              sleep 8
               if app_running; then
                 xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
                 echo "Captured $out (attempt $attempt)"
