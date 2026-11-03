@@ -60,17 +60,20 @@ public final class LocalCalendarManager: ObservableObject {
         }
     }
 
-    public var statusDisplayText: String {
-        if hasReadAccess {
-            return "Authorized · On-Device Only"
-        }
+    /// A short status word for the Sources screen's access row.
+    public var accessStatusLabel: String {
+        if isDemoAuthorized { return "Full Access" }
         switch authorizationStatus {
         case .notDetermined:
-            return "Not Authorized (Tap to Enable)"
+            return "Not Determined"
         case .denied, .restricted:
-            return "Disabled (Enable in Settings)"
-        default:
-            return "Authorized · Read-Only"
+            return "Denied"
+        case .fullAccess, .authorized:
+            return "Full Access"
+        case .writeOnly:
+            return "Write Only"
+        @unknown default:
+            return "Not Determined"
         }
     }
 

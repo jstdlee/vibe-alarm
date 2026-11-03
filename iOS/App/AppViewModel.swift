@@ -12,6 +12,8 @@ public final class AppViewModel: ObservableObject {
     @Published public private(set) var upcomingWeek: [ResolvedDayAlarm] = []
     @Published public var statusBannerMessage: String?
     @Published public var isSyncingICS: Bool = false
+    @Published public private(set) var lastLocalCalendarScanAt: Date?
+    @Published public var isTestingBYOKConnection: Bool = false
 
     public let store: SharedAlarmStore
     public let localCalendarManager = LocalCalendarManager()
@@ -202,6 +204,7 @@ public final class AppViewModel: ObservableObject {
             selectedCalendarIDs: snapshot.selectedLocalCalendarIDs,
             keywords: snapshot.leaveKeywords
         )
+        lastLocalCalendarScanAt = referenceDateOverride ?? Date()
         if !leaveEntries.isEmpty,
            let updated = try? store.upsertHolidayEntries(leaveEntries, replacingSource: .localEventKit) {
             applySnapshot(updated, persist: false)
@@ -284,8 +287,8 @@ public final class AppViewModel: ObservableObject {
         applySnapshot(copy)
     }
 
-    public func addManualHolidayEntry(date: String, title: String, kind: HolidayEntryKind) {
-        let entry = HolidayCalendarEntry(date: date, title: title, kind: kind, source: .builtin)
+    public func addManualHolidayEntry(date: String, title: String, kind: HolidayEntryKind, note: String = "") {
+        let entry = HolidayCalendarEntry(date: date, title: title, kind: kind, source: .builtin, note: note)
         mergeExtractedEntries([entry], discoveredURLs: [])
     }
 
@@ -293,7 +296,8 @@ public final class AppViewModel: ObservableObject {
         oldEntry: HolidayCalendarEntry,
         newDate: String,
         newTitle: String,
-        newKind: HolidayEntryKind
+        newKind: HolidayEntryKind,
+        newNote: String = ""
     ) {
         var copy = snapshot
         copy.holidayEntries.removeAll { $0.id == oldEntry.id }
@@ -301,7 +305,8 @@ public final class AppViewModel: ObservableObject {
             date: newDate,
             title: newTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? newKind.displayTitle : newTitle,
             kind: newKind,
-            source: oldEntry.source
+            source: oldEntry.source,
+            note: newNote
         )
         copy.holidayEntries.append(updated)
         copy.holidayEntries.sort { $0.date < $1.date }
@@ -355,6 +360,27 @@ public final class AppViewModel: ObservableObject {
         var copy = snapshot
         copy.byokConfig = config
         applySnapshot(copy, persist: true)
+    }
+
+    public func testBYOKConnection() async -> String {
+        isTestingBYOKConnection = true
+        defer { isTestingBYOKConnection = false }
+
+        let apiKey = KeychainHelper.loadAPIKey()
+        guard !apiKey.isEmpty else {
+            return "No API key saved yet."
+        }
+        let service = BYOKHolidayService()
+        do {
+            let result = try await service.extractHolidaysViaLLM(
+                userText: "Reply with an empty entries list to confirm this connection works.",
+                config: snapshot.byokConfig,
+                apiKey: apiKey
+            )
+            return "Connected · \(result.summaryNote)"
+        } catch {
+            return "Connection failed: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Notification Permission & Test Trigger

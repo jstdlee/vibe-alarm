@@ -1,21 +1,18 @@
 import SwiftUI
+import UIKit
 import VibeAlarmCore
 
-/// Screen 4 ("Sources"): Braun/Apple Light Theme calendar sources & BYOK settings.
-/// Three clean cards: iOS Calendar access (EventKit), external `.ics` subscriptions,
-/// and the on-device AI parser + bedtime confirmation.
+/// The Sources tab: iOS Calendar access, calendar subscriptions, the on-device
+/// AI parser (BYOK), and a one-line privacy statement. Native `Form` sections only.
 public struct SettingsView: View {
     @ObservedObject var viewModel: AppViewModel
 
-    @State private var subNameInput: String = ""
-    @State private var subURLInput: String = ""
-
-    @State private var newKeywordInput: String = ""
     @State private var apiKeyInput: String = ""
     @State private var provider: BYOKProviderKind = .openAICompatible
     @State private var modelName: String = ""
     @State private var endpointURL: String = ""
-    @State private var savedKeyStatus: String?
+    @State private var byokStatusMessage: String?
+    @State private var showAddSubscriptionSheet = false
 
     public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
@@ -23,320 +20,222 @@ public struct SettingsView: View {
 
     public var body: some View {
         NavigationStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 12) {
-                    header
-                    eventKitCard
-                    externalCalendarsCard
-                    byokAndBedtimeCard
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
+            Form {
+                iOSCalendarSection
+                subscriptionsSection
+                byokSection
+                privacySection
             }
-            .background(Color.vibeCanvas)
-            .navigationBarHidden(true)
+            .navigationTitle("Sources")
             .onAppear {
                 loadInitialState()
             }
+            .sheet(isPresented: $showAddSubscriptionSheet) {
+                AddSubscriptionSheet(viewModel: viewModel)
+            }
         }
         .tint(.vibeAccent)
-        .preferredColorScheme(.light)
     }
 
-    private var header: some View {
-        Text("Sources")
-            .font(.system(size: 26, weight: .bold, design: .rounded))
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    // MARK: - 1. iOS Calendar
 
-    // MARK: - 1. iOS Calendar Access (EventKit)
-
-    private var eventKitCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            cardHeader("iOS CALENDAR ACCESS (EVENTKIT)")
-
+    private var iOSCalendarSection: some View {
+        Section {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(viewModel.localCalendarManager.statusDisplayText)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text("Read-only · never leaves this device")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Access")
                 Spacer()
-                Button {
-                    Task { await viewModel.syncLocalCalendars() }
-                } label: {
-                    Text("Scan Now")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.vibeAccent.opacity(0.14))
-                        .foregroundStyle(.vibeAccent)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-
-            VStack(spacing: 0) {
-                ForEach(viewModel.localCalendarManager.availableCalendars) { cal in
-                    let isSelected = viewModel.snapshot.selectedLocalCalendarIDs.contains(cal.id)
-                    Button {
-                        var copy = viewModel.snapshot
-                        if isSelected {
-                            copy.selectedLocalCalendarIDs.removeAll { $0 == cal.id }
-                        } else {
-                            copy.selectedLocalCalendarIDs.append(cal.id)
-                        }
-                        viewModel.applySnapshot(copy)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(calendarDotColor(cal.colorHex))
-                                .frame(width: 8, height: 8)
-                            Text("\(cal.title) · \(cal.sourceTitle)")
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            if isSelected {
-                                Image(systemName: "checkmark")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(.vibeAccent)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("LEAVE KEYWORDS")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.5)
+                Text(viewModel.localCalendarManager.accessStatusLabel)
                     .foregroundStyle(.secondary)
+            }
 
-                FlowChips(items: viewModel.snapshot.leaveKeywords) { keyword in
-                    viewModel.removeLeaveKeyword(keyword)
+            if viewModel.localCalendarManager.hasReadAccess {
+                ForEach(viewModel.localCalendarManager.availableCalendars) { cal in
+                    calendarToggleRow(cal)
                 }
-
-                HStack(spacing: 8) {
-                    TextField("+ Keyword", text: $newKeywordInput)
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(uiColor: .systemGray6)))
-                    Button {
-                        viewModel.addLeaveKeyword(newKeywordInput)
-                        newKeywordInput = ""
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(.vibeAccent)
-                    }
-                    .buttonStyle(.plain)
+            } else if viewModel.localCalendarManager.authorizationStatus == .denied
+                        || viewModel.localCalendarManager.authorizationStatus == .restricted {
+                Button("Open Settings") {
+                    openSystemSettings()
+                }
+            } else {
+                Button("Grant Access") {
+                    Task { _ = await viewModel.localCalendarManager.requestAccess() }
                 }
             }
+
+            NavigationLink("Leave Keywords") {
+                LeaveKeywordsEditorView(viewModel: viewModel)
+            }
+
+            Button {
+                Task { await viewModel.syncLocalCalendars() }
+            } label: {
+                HStack {
+                    Text("Scan Now")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    if let lastScan = viewModel.lastLocalCalendarScanAt {
+                        Text(Self.timeFormatter.string(from: lastScan))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("iOS Calendar")
+        } footer: {
+            Text("Read-only. Calendar data never leaves this device.")
         }
-        .padding(16)
-        .vibeCard()
     }
 
-    // MARK: - 2. External Calendars (.ics)
-
-    private var externalCalendarsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            cardHeader("EXTERNAL CALENDARS (.ICS)")
-
-            VStack(spacing: 0) {
-                ForEach(viewModel.snapshot.subscriptions) { sub in
-                    HStack {
-                        Toggle(isOn: Binding(
-                            get: { sub.isEnabled },
-                            set: { enabled in viewModel.toggleSubscription(id: sub.id, isEnabled: enabled) }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(sub.name)
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.primary)
-                                Text(hostLabel(for: sub.url))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .tint(.vibeAccent)
-                    }
-                    .padding(.vertical, 6)
-                    Divider()
+    private func calendarToggleRow(_ cal: LocalCalendarSourceInfo) -> some View {
+        Toggle(isOn: Binding(
+            get: { viewModel.snapshot.selectedLocalCalendarIDs.contains(cal.id) },
+            set: { isOn in
+                var copy = viewModel.snapshot
+                if isOn {
+                    copy.selectedLocalCalendarIDs.append(cal.id)
+                } else {
+                    copy.selectedLocalCalendarIDs.removeAll { $0 == cal.id }
                 }
+                viewModel.applySnapshot(copy)
             }
-
+        )) {
             HStack(spacing: 8) {
-                TextField("Calendar name", text: $subNameInput)
-                    .font(.caption)
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(uiColor: .systemGray6)))
-                TextField("https:// or webcal:// .ics link", text: $subURLInput)
-                    .font(.caption)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(uiColor: .systemGray6)))
-            }
-
-            HStack {
-                Button {
-                    guard !subURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                    viewModel.addSubscription(
-                        name: subNameInput.isEmpty ? "External Calendar (.ics)" : subNameInput,
-                        url: subURLInput,
-                        region: .custom
-                    )
-                    subNameInput = ""
-                    subURLInput = ""
-                } label: {
-                    Text("+ Add .ics Feed")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Color.vibeAccent)
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Button {
-                    Task { await viewModel.syncExternalSubscriptions() }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                        Text(viewModel.isSyncingICS ? "Syncing…" : "Refresh All")
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.vibeAccent)
-                }
-                .buttonStyle(.plain)
+                Circle()
+                    .fill(Color(hex: cal.colorHex))
+                    .frame(width: 8, height: 8)
+                Text(cal.title)
             }
         }
-        .padding(16)
-        .vibeCard()
     }
 
-    // MARK: - 3. On-Device AI Parser (BYOK) & Bedtime
+    // MARK: - 2. Subscriptions
 
-    private var byokAndBedtimeCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            cardHeader("ON-DEVICE AI PARSER (BYOK) & BEDTIME")
+    private var subscriptionsSection: some View {
+        Section {
+            ForEach(viewModel.snapshot.subscriptions) { sub in
+                subscriptionRow(sub)
+            }
 
+            Button("Add Subscription…") {
+                showAddSubscriptionSheet = true
+            }
+
+            Button {
+                Task { await viewModel.syncExternalSubscriptions() }
+            } label: {
+                Text(viewModel.isSyncingICS ? "Refreshing…" : "Refresh All")
+            }
+            .disabled(viewModel.isSyncingICS)
+        } header: {
+            Text("Subscriptions")
+        } footer: {
+            if let latest = viewModel.snapshot.subscriptions.compactMap(\.lastSyncedAt).max() {
+                Text("Last refreshed \(Self.timeFormatter.string(from: latest))")
+            }
+        }
+    }
+
+    private func subscriptionRow(_ sub: ExternalCalendarSubscription) -> some View {
+        Toggle(isOn: Binding(
+            get: { sub.isEnabled },
+            set: { enabled in viewModel.toggleSubscription(id: sub.id, isEnabled: enabled) }
+        )) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(sub.name)
+                Text(URL(string: sub.url)?.host ?? sub.url)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .swipeActions {
+            Button(role: .destructive) {
+                viewModel.removeSubscription(id: sub.id)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    // MARK: - 3. AI Assistant (BYOK)
+
+    private var byokSection: some View {
+        Section {
             Picker("Provider", selection: $provider) {
                 Text("OpenAI Compatible").tag(BYOKProviderKind.openAICompatible)
-                Text("Anthropic Claude").tag(BYOKProviderKind.anthropic)
+                Text("Anthropic").tag(BYOKProviderKind.anthropic)
             }
-            .pickerStyle(.segmented)
             .onChange(of: provider) { _, newValue in
                 endpointURL = newValue.defaultEndpoint
                 modelName = newValue.defaultModel
                 persistBYOKConfig()
             }
 
-            labeledField(label: "Model", text: $modelName, placeholder: "gpt-4o-mini")
-            labeledField(label: "Endpoint", text: $endpointURL, placeholder: provider.defaultEndpoint)
+            HStack {
+                Text("Base URL")
+                Spacer()
+                TextField("URL", text: $endpointURL)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+                    .onSubmit { persistBYOKConfig() }
+            }
+
+            HStack {
+                Text("Model")
+                Spacer()
+                TextField("Model", text: $modelName)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+                    .onSubmit { persistBYOKConfig() }
+            }
 
             HStack {
                 Text("API Key")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 70, alignment: .leading)
-                SecureField("Paste API Key", text: $apiKeyInput)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(Color(uiColor: .systemGray6)))
-                Button("Save") {
-                    _ = KeychainHelper.saveAPIKey(apiKeyInput)
-                    savedKeyStatus = apiKeyInput.isEmpty ? "Cleared" : "Saved to Keychain"
-                    persistBYOKConfig()
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.vibeAccent)
-            }
-
-            Text(savedKeyStatus ?? (apiKeyInput.isEmpty ? "Not set · using on-device parser" : "Stored in iOS Keychain"))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Divider()
-
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Bedtime Confirmation")
-                        .font(.subheadline.weight(.medium))
-                    Text(viewModel.snapshot.alarmRule.formattedBedtimeReminder)
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
                 Spacer()
-                DatePicker(
-                    "Bedtime Time",
-                    selection: bedtimeDateBinding,
-                    displayedComponents: .hourAndMinute
-                )
-                .labelsHidden()
-                Toggle("", isOn: Binding(
-                    get: { viewModel.snapshot.alarmRule.bedtimeReminderEnabled },
-                    set: { val in viewModel.updateAlarmRule { $0.bedtimeReminderEnabled = val } }
-                ))
-                .labelsHidden()
-                .tint(.vibeAccent)
+                SecureField("Required", text: $apiKeyInput)
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit { saveAPIKey() }
             }
+
+            Button("Test Connection") {
+                Task {
+                    saveAPIKey()
+                    byokStatusMessage = await viewModel.testBYOKConnection()
+                }
+            }
+            .disabled(viewModel.isTestingBYOKConnection)
+        } header: {
+            Text("AI Assistant (BYOK)")
+        } footer: {
+            Text(byokStatusMessage ?? "Stored on this device in the Keychain.")
         }
-        .padding(16)
-        .vibeCard()
     }
 
-    private func labeledField(label: String, text: Binding<String>, placeholder: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.caption.weight(.semibold))
+    // MARK: - 4. Privacy
+
+    private var privacySection: some View {
+        Section {
+            Text("Everything stays on this iPhone. No account, no server.")
+                .font(.footnote)
                 .foregroundStyle(.secondary)
-                .frame(width: 70, alignment: .leading)
-            TextField(placeholder, text: text)
-                .font(.caption)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 7).fill(Color(uiColor: .systemGray6)))
         }
     }
 
-    private func cardHeader(_ caption: String) -> some View {
-        Text(caption)
-            .font(.system(size: 11, weight: .bold))
-            .tracking(0.5)
-            .foregroundStyle(.secondary)
+    // MARK: - Actions
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
-    private var bedtimeDateBinding: Binding<Date> {
-        Binding(
-            get: {
-                let minutes = viewModel.snapshot.alarmRule.preBedtimeReminderMinutes
-                var comps = DateComponents()
-                comps.hour = minutes / 60
-                comps.minute = minutes % 60
-                return Calendar.current.date(from: comps) ?? Date()
-            },
-            set: { newDate in
-                let comps = Calendar.current.dateComponents([.hour, .minute], from: newDate)
-                let minutes = (comps.hour ?? 22) * 60 + (comps.minute ?? 30)
-                viewModel.updateAlarmRule { $0.preBedtimeReminderMinutes = minutes }
-            }
-        )
+    private func saveAPIKey() {
+        _ = KeychainHelper.saveAPIKey(apiKeyInput)
+        persistBYOKConfig()
     }
 
     private func loadInitialState() {
@@ -354,45 +253,120 @@ public struct SettingsView: View {
         )
     }
 
-    private func hostLabel(for urlString: String) -> String {
-        URL(string: urlString)?.host ?? urlString
-    }
-
-    private func calendarDotColor(_ hex: String) -> Color {
-        switch hex {
-        case "#007AFF": return .vibeWork
-        case "#34C759": return .vibePTO
-        case "#AF52DE": return .purple
-        default: return .vibeAccent
-        }
-    }
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
-/// Simple wrapping chip row for leave keywords with a tap-to-remove affordance.
-private struct FlowChips: View {
-    let items: [String]
-    let onRemove: (String) -> Void
+// MARK: - Leave Keywords Editor (Pushed)
 
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(items, id: \.self) { item in
-                    HStack(spacing: 4) {
-                        Text(item)
-                            .font(.caption.weight(.medium))
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .bold))
+public struct LeaveKeywordsEditorView: View {
+    @ObservedObject var viewModel: AppViewModel
+    @State private var newKeyword: String = ""
+
+    public var body: some View {
+        List {
+            Section {
+                ForEach(viewModel.snapshot.leaveKeywords, id: \.self) { keyword in
+                    Text(keyword)
+                }
+                .onDelete { offsets in
+                    for index in offsets {
+                        viewModel.removeLeaveKeyword(viewModel.snapshot.leaveKeywords[index])
                     }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(Color.vibeAccent.opacity(0.12))
-                    .foregroundStyle(.vibeAccent)
-                    .clipShape(Capsule())
-                    .onTapGesture {
-                        onRemove(item)
+                }
+            } footer: {
+                Text("Local calendar events whose title or notes contain one of these words are treated as personal leave.")
+            }
+
+            Section {
+                HStack {
+                    TextField("New keyword", text: $newKeyword)
+                    Button("Add") {
+                        viewModel.addLeaveKeyword(newKeyword)
+                        newKeyword = ""
                     }
+                    .disabled(newKeyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
+        .navigationTitle("Leave Keywords")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Add Subscription Sheet
+
+public struct AddSubscriptionSheet: View {
+    @ObservedObject var viewModel: AppViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String = ""
+    @State private var urlText: String = ""
+    @State private var validationMessage: String?
+
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name", text: $name)
+                    TextField("https:// or webcal:// link", text: $urlText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                } footer: {
+                    if let validationMessage {
+                        Text(validationMessage)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Add Subscription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { addSubscription() }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .tint(.vibeAccent)
+    }
+
+    private func addSubscription() {
+        let trimmedURL = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmedURL.replacingOccurrences(of: "webcal://", with: "https://")
+        guard let url = URL(string: normalized), url.scheme == "https" else {
+            validationMessage = "Enter a valid https:// or webcal:// link."
+            return
+        }
+        let finalName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        viewModel.addSubscription(
+            name: finalName.isEmpty ? "Calendar Subscription" : finalName,
+            url: normalized,
+            region: .custom
+        )
+        dismiss()
+    }
+}
+
+// MARK: - Hex Color Helper
+
+private extension Color {
+    init(hex: String) {
+        var sanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        sanitized.removeAll { $0 == "#" }
+        var value: UInt64 = 0
+        _ = Scanner(string: sanitized).scanHexInt64(&value)
+        let r = Double((value & 0xFF0000) >> 16) / 255.0
+        let g = Double((value & 0x00FF00) >> 8) / 255.0
+        let b = Double(value & 0x0000FF) / 255.0
+        self = Color(red: r, green: g, blue: b)
     }
 }

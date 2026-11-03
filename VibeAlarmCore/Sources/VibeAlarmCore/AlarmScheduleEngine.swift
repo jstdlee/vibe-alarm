@@ -316,6 +316,51 @@ public struct AlarmScheduleEngine: Sendable {
                 matchedEntries: dayEntries
             )
 
+        case .weekends:
+            guard wday.isWeekend else {
+                return ResolvedDayAlarm(
+                    date: dateString,
+                    displayLabel: displayLabel,
+                    weekdayText: wday.shortWeekdayName,
+                    baseTime: baseTimeStr,
+                    effectiveTime: nil,
+                    effectiveHour: nil,
+                    effectiveMinute: nil,
+                    status: .noAlarm,
+                    reasonBadge: "Weekday · No Alarm",
+                    hasManualOverride: false,
+                    matchedEntries: dayEntries
+                )
+            }
+            if rule.skipPublicHolidays, let holiday = publicHolidayEntry {
+                return ResolvedDayAlarm(
+                    date: dateString,
+                    displayLabel: displayLabel,
+                    weekdayText: wday.shortWeekdayName,
+                    baseTime: baseTimeStr,
+                    effectiveTime: nil,
+                    effectiveHour: nil,
+                    effectiveMinute: nil,
+                    status: .skippedByHoliday(reason: holiday.title),
+                    reasonBadge: "\(holiday.title) · Holiday Auto-Skip",
+                    hasManualOverride: false,
+                    matchedEntries: dayEntries
+                )
+            }
+            return ResolvedDayAlarm(
+                date: dateString,
+                displayLabel: displayLabel,
+                weekdayText: wday.shortWeekdayName,
+                baseTime: baseTimeStr,
+                effectiveTime: baseTimeStr,
+                effectiveHour: rule.hour,
+                effectiveMinute: rule.minute,
+                status: .scheduled,
+                reasonBadge: "Weekend · Normal Ring",
+                hasManualOverride: false,
+                matchedEntries: dayEntries
+            )
+
         case .customDays(let days):
             let isMakeup = rule.skipPublicHolidays && makeupEntry != nil
             guard days.contains(wday) || isMakeup else {
@@ -422,6 +467,8 @@ public struct AlarmScheduleEngine: Sendable {
             return !weekday.isWeekend || hasMakeup
         case .everyday:
             return true
+        case .weekends:
+            return weekday.isWeekend
         case .customDays(let days):
             return days.contains(weekday) || hasMakeup
         case .specificDates(let dates):

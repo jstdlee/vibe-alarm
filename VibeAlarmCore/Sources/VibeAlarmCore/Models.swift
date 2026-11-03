@@ -55,6 +55,8 @@ public enum AlarmRepeatMode: Codable, Equatable, Hashable, Sendable {
     case weekdays
     /// Every day of the week.
     case everyday
+    /// Saturday and Sunday only.
+    case weekends
     /// Custom selected days of the week.
     case customDays(Set<Weekday>)
     /// Specific calendar dates in `YYYY-MM-DD` format.
@@ -66,6 +68,8 @@ public enum AlarmRepeatMode: Codable, Equatable, Hashable, Sendable {
             return "Workdays (Smart Holiday & Makeup)"
         case .everyday:
             return "Every Day"
+        case .weekends:
+            return "Weekends"
         case .customDays(let days):
             if days == Weekday.standardWeekdays {
                 return "Mon–Fri"
@@ -175,7 +179,7 @@ public struct NextDayOverride: Codable, Equatable, Sendable {
 
 // MARK: - Holiday & Leave Calendar Entry
 
-public enum HolidayEntryKind: String, Codable, CaseIterable, Sendable {
+public enum HolidayEntryKind: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     /// Statutory public holiday -> skips alarm.
     case publicHoliday
     /// Statutory makeup workday on a weekend -> triggers workday alarm.
@@ -200,7 +204,7 @@ public enum HolidayEntryKind: String, Codable, CaseIterable, Sendable {
     }
 }
 
-public enum HolidayEntrySource: String, Codable, CaseIterable, Sendable {
+public enum HolidayEntrySource: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     case builtin
     case externalICS
     case localEventKit
@@ -208,10 +212,10 @@ public enum HolidayEntrySource: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .builtin: return "Built-in Calendar"
-        case .externalICS: return "External .ics Subscription"
-        case .localEventKit: return "iOS Calendar (EventKit)"
-        case .byokLLM: return "BYOK AI Entry"
+        case .builtin: return "Built-in"
+        case .externalICS: return "Subscription"
+        case .localEventKit: return "iOS Calendar"
+        case .byokLLM: return "AI"
         }
     }
 }
@@ -223,23 +227,35 @@ public struct HolidayCalendarEntry: Codable, Identifiable, Equatable, Hashable, 
     public var title: String
     public var kind: HolidayEntryKind
     public var source: HolidayEntrySource
+    public var note: String
 
     public init(
         date: String,
         title: String,
         kind: HolidayEntryKind,
-        source: HolidayEntrySource
+        source: HolidayEntrySource,
+        note: String = ""
     ) {
         self.date = date
         self.title = title
         self.kind = kind
         self.source = source
+        self.note = note
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = try container.decode(String.self, forKey: .date)
+        title = try container.decode(String.self, forKey: .title)
+        kind = try container.decode(HolidayEntryKind.self, forKey: .kind)
+        source = try container.decode(HolidayEntrySource.self, forKey: .source)
+        note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
     }
 }
 
 // MARK: - External Calendar Subscription (.ics)
 
-public enum HolidayRegionHint: String, Codable, CaseIterable, Sendable {
+public enum HolidayRegionHint: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     case sg = "SG"
     case cn = "CN"
     case custom = "Custom"

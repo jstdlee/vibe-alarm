@@ -50,7 +50,7 @@ struct VibeAlarmTimelineProvider: TimelineProvider {
     }
 }
 
-// MARK: - Widget View (Small & Medium — Braun / Apple Light Clock Aesthetic)
+// MARK: - Widget View (Small & Medium)
 
 struct VibeAlarmWidgetEntryView: View {
     var entry: VibeAlarmWidgetEntry
@@ -60,130 +60,14 @@ struct VibeAlarmWidgetEntryView: View {
         Group {
             switch family {
             case .systemSmall:
-                smallView
+                SmallWidgetContentView(tomorrow: entry.tomorrow)
             default:
-                mediumView
+                MediumWidgetContentView(today: entry.today, tomorrow: entry.tomorrow)
             }
         }
         .containerBackground(for: .widget) {
-            Color.vibeCard
+            Color(.systemBackground)
         }
-    }
-
-    private var smallView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("TOMORROW · \(entry.tomorrow.weekdayText.uppercased())")
-                .font(.system(size: 10, weight: .bold))
-                .tracking(0.5)
-                .foregroundStyle(.vibeAccent)
-
-            Spacer(minLength: 0)
-
-            Text(entry.tomorrow.status.isRinging ? (entry.tomorrow.effectiveTime ?? entry.tomorrow.baseTime) : "OFF")
-                .font(.system(size: 32, weight: .light, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(entry.tomorrow.status.isRinging ? Color.vibeInk : Color.vibeInkMuted)
-
-            Text(entry.tomorrow.reasonBadge)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            Spacer(minLength: 4)
-
-            HStack(spacing: 6) {
-                Button(intent: SkipTomorrowIntent()) {
-                    Text("Skip")
-                        .font(.caption2.weight(.medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
-
-                if entry.tomorrow.hasManualOverride {
-                    Button(intent: RestoreTomorrowIntent()) {
-                        Text("Restore")
-                            .font(.caption2.weight(.medium))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.vibeAccent)
-                } else {
-                    Button(intent: DelayTomorrow30Intent()) {
-                        Text("+30m")
-                            .font(.caption2.weight(.medium))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.vibeAccent)
-                }
-            }
-        }
-    }
-
-    private var mediumView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                dayBlock(day: entry.today, isTomorrow: false)
-                Divider()
-                    .padding(.horizontal, 4)
-                dayBlock(day: entry.tomorrow, isTomorrow: true)
-            }
-
-            HStack(spacing: 8) {
-                Button(intent: SkipTomorrowIntent()) {
-                    Text("Skip")
-                        .font(.caption.weight(.medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
-
-                Button(intent: DelayTomorrow30Intent()) {
-                    Text("+30m")
-                        .font(.caption.weight(.medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
-
-                Button(intent: DelayTomorrow60Intent()) {
-                    Text("+1h")
-                        .font(.caption.weight(.medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
-
-                Button(intent: RestoreTomorrowIntent()) {
-                    Text("Restore")
-                        .font(.caption.weight(.medium))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(entry.tomorrow.hasManualOverride ? Color.vibeAccent : Color.secondary)
-            }
-        }
-    }
-
-    private func dayBlock(day: ResolvedDayAlarm, isTomorrow: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(isTomorrow ? "TOMORROW" : "TODAY") · \(day.weekdayText.uppercased())")
-                .font(.system(size: 10, weight: .bold))
-                .tracking(0.5)
-                .foregroundStyle(isTomorrow ? Color.vibeAccent : Color.vibeInkMuted)
-
-            Text(day.status.isRinging ? (day.effectiveTime ?? day.baseTime) : "OFF")
-                .font(.system(size: 30, weight: .light, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(day.status.isRinging ? Color.vibeInk : Color.vibeInkMuted)
-
-            Text(day.reasonBadge)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -1,6 +1,6 @@
 # VibeAlarm
 
-**A 100% on-device, privacy-first iOS alarm with Apple Light Theme + Braun (Dieter Rams) industrial precision, built to understand public holidays, weekend makeup workdays, and personal leave.**
+**A 100% on-device, privacy-first iOS alarm built in genuine Apple Human Interface Guidelines style, that understands public holidays, weekend makeup workdays, and personal leave.**
 
 [![CI](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml/badge.svg)](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml)
 ![iOS 17.0+](https://img.shields.io/badge/iOS-17.0%2B-F5F5F7?logo=apple&logoColor=black)
@@ -10,9 +10,8 @@
   <img src="docs/screenshots/hero-overview.png" width="100%" alt="VibeAlarm iOS Simulator Light Theme Overview">
 </p>
 
-> **Design principles**: a crisp **Apple Light Theme** (`#F5F5F7` alabaster canvas, `#FFFFFF` matte cards, `#FF5500` Braun International Orange accent) paired with **Dieter Rams / Braun machined-aluminum tactile UI**:
-> - **Dual semi-circular rotary dials** anchored to the left (`HOUR 00–23`) and right (`MIN 00–59`) screen edges in the lower thumb zone, with knurled radial ticks and a sharp orange index needle.
-> - **Horizontal mechanical rollers** replace traditional dropdowns for repeat mode, holiday policy, and calendar filtering — swipe or tap to step through options.
+> **Design principles**: native `List`/`Form` with the `.insetGrouped` style, system semantic colors (`Color(.systemGroupedBackground)`, `.primary`, `.secondary`), and exactly one accent color (system orange). No gradients, no badges, no decorative chrome.
+> - **Two skeuomorphic controls, and only two**: a pair of semicircular rotary dials (`SemicircleDial`) anchored to the left and right screen edges for picking the hour and minute, and horizontal thumbwheel rollers (`ThumbwheelRoller`) that replace dropdown menus for repeat mode and holiday policy.
 > - **Built-in calendar & events manager**, **external `.ics` subscriptions**, and **iOS Calendar (`EventKit`) access settings** are all reachable from the bottom tab bar, with every byte of data staying in the on-device App Group sandbox.
 
 ---
@@ -29,30 +28,30 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
   <img src="docs/screenshots/05-widgets-and-byok.png" width="19%" alt="Widgets, Bedtime Notification & BYOK AI">
 </p>
 
-| 1. Alarms (`TwoDayDashboardView`) | 2. Time Dial (`DualThumbTimeDialView`) |
+| 1. Alarm (`TwoDayDashboardView`) | 2. Wake Time (`TimeEditorView`) |
 | :---: | :---: |
-| <img src="docs/screenshots/01-two-day-dashboard.png" width="88%" alt="Two-Day Dashboard Light Theme"> | <img src="docs/screenshots/02-dual-thumb-dial.png" width="88%" alt="Dual-Thumb Semi-Circular Dials & Horizontal Rollers"> |
-| Spacious **Today** and **Tomorrow** hero cards show the live status (`RINGING`, `SKIPPED`, `DELAYED`) with the reason at a glance — a makeup workday auto-enabling the alarm, or a holiday auto-skipping it. A one-tap action bar (`Skip`, `+30m`, `+1h`, `Keep On`) overrides just tomorrow; the day after automatically restores the normal schedule. | Machined-aluminum **horizontal rollers** set the repeat mode and holiday policy. In the lower thumb zone, symmetric **semi-circular rotary dials** anchored to the screen edges let your left thumb spin the hour and your right thumb spin the minute, with a center column of quick-snap presets. |
+| <img src="docs/screenshots/01-two-day-dashboard.png" width="88%" alt="Alarm Tab Light Theme"> | <img src="docs/screenshots/02-dual-thumb-dial.png" width="88%" alt="Semicircle Dials & Thumbwheel Rollers"> |
+| A plain `List` shows **Today** and **Tomorrow** with the effective wake time in large light digits, or `Off` / `Skipped`, plus a short reason line when relevant (a holiday, a makeup workday, a delay). `Skip` / `+30 min` / `Restore` apply to tomorrow only and restore automatically the day after. | The signature interaction: two `SemicircleDial` half-discs anchored to the screen edges for the hour and minute, and two `ThumbwheelRoller` rows below for repeat mode (`Workdays` / `Every Day` / `Weekends` / `Custom` / `Once`) and holiday rule (`Smart` / `Always Ring`). |
 
 | 3. Calendar (`HolidayCalendarView`) | 4. Sources (`SettingsView`) |
 | :---: | :---: |
 | <img src="docs/screenshots/03-builtin-calendar-events.png" width="88%" alt="Built-in Calendar & Events Manager"> | <img src="docs/screenshots/04-external-and-ios-calendar-settings.png" width="88%" alt="External ICS & iOS EventKit Calendar Settings"> |
-| A clean monthly grid marks each day with a compact `OFF` / `WRK` / `PTO` micro-pill. Tap any date to add, edit, or delete a holiday, makeup workday, or personal leave entry, or paste a notice for the on-device AI parser. | iOS Calendar (`EventKit`) access status, selectable local calendars, and leave keyword chips live alongside external `.ics` subscription toggles for statutory holiday feeds — plus the BYOK AI provider, model, Keychain-backed API key, and bedtime confirmation settings. |
+| A custom month grid marks each day with a small colored dot (red = public holiday, blue = makeup workday, green = personal leave). Tap a day to filter the native list below it; swipe to delete, tap to edit, or import entries from pasted text with the on-device AI parser. | iOS Calendar (`EventKit`) access status and per-calendar toggles, editable leave keywords, `.ics` subscription toggles for statutory holiday feeds, and the BYOK AI provider / model / Keychain-backed API key settings — all in native `Form` sections. |
 
-| 5. Widgets (`WidgetAndBedtimeShowcaseView`) |
+| 5. Widgets (`WidgetGalleryView`) |
 | :---: |
-| <img src="docs/screenshots/05-widgets-and-byok.png" width="44%" alt="Interactive Widget, Bedtime Notification & BYOK AI"> |
-| A Home Screen `SystemMedium` widget shows both days with interactive `Skip` / `+30m` / `+1h` / `Restore` buttons — no need to open the app. A nightly bedtime confirmation notification previews tomorrow's status with the same one-tap actions available via long-press. |
+| <img src="docs/screenshots/05-widgets-and-byok.png" width="44%" alt="Small and Medium Home Screen Widgets"> |
+| The small and medium Home Screen widgets, reusing the exact SwiftUI views from `iOS/Shared/WidgetViews.swift`. The medium widget shows both days with interactive `Skip` / `+30 min` / `Restore` buttons — no need to open the app. A nightly bedtime reminder notification previews tomorrow's status with the same one-tap actions available via long-press. |
 
 ---
 
 ## Core Features
 
-1. **Dual semi-circular rotary dials + horizontal rollers** (`DualThumbTimeDialView`):
-   - Left (`HOUR`) and right (`MIN`) machined-aluminum dials anchored to the screen edges with radial tick marks, an orange index needle, and `UIImpactFeedbackGenerator` tactile feedback.
-   - Horizontal rollers replace dropdown menus for repeat mode and holiday policy.
+1. **Two reusable skeuomorphic controls, used nowhere else** (`iOS/Shared/SemicircleDial.swift`, `iOS/Shared/ThumbwheelRoller.swift`):
+   - `SemicircleDial` — a half-disc rotary dial anchored to a screen edge, rotated with a circular drag gesture, with fine tick marks and a fixed orange index notch. Used for the hour (0–23) and minute (0–59).
+   - `ThumbwheelRoller` — a horizontal cylinder of text options with the center value bold and neighbors fading toward the edges. Replaces dropdowns for repeat mode and holiday rule.
 2. **Built-in calendar & events manager** (`HolidayCalendarView`):
-   - Monthly grid with `OFF` / `WRK` / `PTO` badges, full CRUD for holidays, makeup workdays, and personal leave, plus a BYOK AI notice parser.
+   - Month grid with colored day markers, full CRUD (title, date, kind, note) for holidays, makeup workdays, and personal leave, plus a BYOK AI notice parser.
 3. **External `.ics` subscriptions & iOS Calendar (`EventKit`) access** (`SettingsView`):
    - On-device, read-only `EventKit` scanning of selected local/iCloud/Exchange calendars against custom leave keywords (`PTO`, `Leave`, `Vacation`, `Annual Leave`, `Day Off`, `Sick Leave`).
    - Built-in China statutory holiday and Singapore MOM public holiday feeds, plus any custom `.ics` / `webcal` link.
@@ -64,9 +63,9 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
 ## Architecture
 
 - **`VibeAlarmCore`** — a dependency-free Swift package with the scheduling engine (`AlarmScheduleEngine`), models, the zero-network `.ics` parser (`ICSHolidayParser`), the BYOK LLM + offline natural-language holiday extractor (`BYOKHolidayService`), and the shared App Group persistence layer (`SharedAlarmStore`). Fully unit tested.
-- **`iOS/App`** — the SwiftUI app target: five tabs (`Alarms`, `Time Dial`, `Calendar`, `Sources`, `Widgets`), the view model (`AppViewModel`), on-device `EventKit` access (`LocalCalendarManager`), and Keychain storage (`KeychainHelper`).
-- **`iOS/Shared`** — code shared between the app and the widget extension: `AppIntents` for Siri/Shortcuts/interactive widget actions, the notification scheduler, app-wide constants, and the Braun/Apple color palette.
-- **`iOS/Widget`** — the WidgetKit extension with `SystemSmall` and `SystemMedium` Home Screen widgets.
+- **`iOS/App`** — the SwiftUI app target: three tabs (`Alarm`, `Calendar`, `Sources`), the wake time editor (`TimeEditorView`), the view model (`AppViewModel`), on-device `EventKit` access (`LocalCalendarManager`), and Keychain storage (`KeychainHelper`).
+- **`iOS/Shared`** — code shared between the app and the widget extension: the two skeuomorphic controls, the pure SwiftUI widget views (`WidgetViews.swift`), `AppIntents` for Siri/Shortcuts/interactive widget actions, the notification scheduler, and app-wide constants.
+- **`iOS/Widget`** — the WidgetKit extension with `SystemSmall` and `SystemMedium` Home Screen widgets, built from the shared widget views.
 
 ## Build & Test
 

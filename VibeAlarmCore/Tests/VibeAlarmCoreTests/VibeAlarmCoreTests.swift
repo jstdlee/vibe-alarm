@@ -125,6 +125,30 @@ final class VibeAlarmCoreTests: XCTestCase {
         XCTAssertTrue(tomorrowKept.hasManualOverride)
     }
 
+    func testWeekendsRepeatModeOnlyRingsOnSaturdayAndSunday() throws {
+        let rule = AlarmRule(hour: 9, minute: 0, repeatMode: .weekends, skipPublicHolidays: true)
+        // 2026-10-26 is a Monday
+        let monday = try XCTUnwrap(engine.date(from: "2026-10-26"))
+
+        let days = engine.resolveSchedule(
+            rule: rule,
+            entries: [],
+            override: nil,
+            referenceDate: monday,
+            daysCount: 6
+        )
+
+        // Monday..Friday: no alarm
+        for weekday in days.prefix(5) {
+            XCTAssertEqual(weekday.status, .noAlarm)
+        }
+
+        // Saturday 2026-10-31: rings at 09:00
+        XCTAssertEqual(days[5].date, "2026-10-31")
+        XCTAssertEqual(days[5].status, .scheduled)
+        XCTAssertEqual(days[5].effectiveTime, "09:00")
+    }
+
     // MARK: - ICS Parser Tests
 
     func testICSHolidayParserMultiDayAndMakeupWorkday() {

@@ -1,439 +1,245 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// Screen 3 ("Calendar"): Braun/Apple Light Theme built-in calendar & events manager.
-/// Interactive monthly grid with `OFF` / `WRK` / `PTO` micro-pills, a horizontal roller filter,
-/// and full CRUD for holidays, makeup workdays, and personal leave.
+/// The Calendar tab: a month grid with small colored markers (red = holiday,
+/// blue = makeup workday, green = leave), and a native list of entries for the
+/// selected day (or the whole month when nothing is selected).
 public struct HolidayCalendarView: View {
     @ObservedObject var viewModel: AppViewModel
 
-    @State private var displayedYear: Int = 2026
-    @State private var displayedMonth: Int = 11
-    @State private var selectedDateString: String = "2026-11-09"
+    @State private var displayedYear: Int
+    @State private var displayedMonth: Int
+    @State private var selectedDateString: String?
 
-    @State private var eventTitleInput: String = ""
-    @State private var eventKindSelection: HolidayEntryKind = .personalLeave
+    @State private var showEditorSheet = false
     @State private var editingEntry: HolidayCalendarEntry?
-    @State private var showEditorCard: Bool = false
-
-    @State private var filterRollerIndex: Int = 0
-    @State private var showBYOKSheet: Bool = false
-
-    private let filterOptions: [String] = ["All", "Holidays", "Workdays", "Leave"]
+    @State private var showBYOKSheet = false
 
     public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
+        let todayDate = viewModel.todayAlarm.date
+        let parts = todayDate.split(separator: "-")
+        let year = parts.count > 0 ? (Int(parts[0]) ?? 2026) : 2026
+        let month = parts.count > 1 ? (Int(parts[1]) ?? 1) : 1
+        _displayedYear = State(initialValue: year)
+        _displayedMonth = State(initialValue: month)
+        _selectedDateString = State(initialValue: todayDate)
     }
 
     public var body: some View {
         NavigationStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 12) {
-                    monthBar
-                    monthlyCalendarCard
-                    filterRollerCard
-
-                    if showEditorCard {
-                        eventEditorCard
-                    }
-
-                    eventsListCard
+            List {
+                Section {
+                    monthGridCard
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
+                .listRowInsets(EdgeInsets())
+
+                Section {
+                    ForEach(listedEntries) { entry in
+                        entryRow(entry)
+                    }
+                } header: {
+                    Text(listHeaderTitle)
+                }
             }
-            .background(Color.vibeCanvas)
-            .navigationBarHidden(true)
+            .listStyle(.insetGrouped)
+            .navigationTitle("Calendar")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        editingEntry = nil
+                        showEditorSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add Entry")
+                }
+                ToolbarItem(placement: .secondaryAction) {
+                    Button("Import with AI") {
+                        showBYOKSheet = true
+                    }
+                }
+            }
+            .sheet(isPresented: $showEditorSheet) {
+                HolidayEntryEditorSheet(
+                    viewModel: viewModel,
+                    initialDateString: editingEntry?.date ?? (selectedDateString ?? viewModel.todayAlarm.date),
+                    existingEntry: editingEntry
+                )
+            }
             .sheet(isPresented: $showBYOKSheet) {
                 BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
             }
         }
         .tint(.vibeAccent)
-        .preferredColorScheme(.light)
     }
 
-    // MARK: - Month Bar
+    // MARK: - Month Grid
 
-    private var monthBar: some View {
-        HStack(spacing: 10) {
+    private var monthGridCard: some View {
+        VStack(spacing: 10) {
+            monthHeader
+            weekdayHeaderRow
+            monthGrid
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    private var monthHeader: some View {
+        HStack {
             Button {
                 shiftMonth(by: -1)
             } label: {
-                Image(systemName: "chevron.left.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.vibeAccent)
-            }
-            .buttonStyle(.plain)
-
-            Text("\(Self.monthFullNames[displayedMonth - 1]) \(displayedYear)")
-                .font(.headline.weight(.bold))
-                .monospacedDigit()
-                .foregroundStyle(.primary)
-
-            Button {
-                shiftMonth(by: 1)
-            } label: {
-                Image(systemName: "chevron.right.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.vibeAccent)
+                Image(systemName: "chevron.left")
             }
             .buttonStyle(.plain)
 
             Spacer()
 
-            Button {
-                editingEntry = nil
-                eventTitleInput = ""
-                showEditorCard = true
-            } label: {
-                Text("+ Add")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.vibeAccent)
-                    .foregroundStyle(.white)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
+            Text("\(Self.monthFullNames[displayedMonth - 1]) \(String(displayedYear))")
+                .font(.headline)
+
+            Spacer()
 
             Button {
-                showBYOKSheet = true
+                shiftMonth(by: 1)
             } label: {
-                Text("AI Parse")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(uiColor: .systemGray6))
-                    .foregroundStyle(.primary)
-                    .clipShape(Capsule())
+                Image(systemName: "chevron.right")
             }
             .buttonStyle(.plain)
         }
+        .foregroundStyle(.primary)
     }
 
-    // MARK: - Monthly Calendar Grid
-
-    private var monthlyCalendarCard: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                legendDot(label: "Holiday", color: .vibeAccent)
-                legendDot(label: "Workday", color: .vibeWork)
-                legendDot(label: "Leave", color: .vibePTO)
-                Spacer()
+    private var weekdayHeaderRow: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(Self.weekdayHeaders.enumerated()), id: \.offset) { _, label in
+                Text(label)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
             }
+        }
+    }
 
-            HStack(spacing: 0) {
-                ForEach(Array(Self.weekdayHeaders.enumerated()), id: \.offset) { idx, label in
-                    Text(label)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(idx >= 5 ? Color.vibeAccent : Color.secondary)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-
-            let cells = buildMonthCells(year: displayedYear, month: displayedMonth)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 6) {
-                ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
-                    if let dayNum = cell.day, let dateStr = cell.dateString {
-                        dayCell(dayNum: dayNum, dateStr: dateStr)
-                    } else {
-                        Color.clear.frame(height: 42)
-                    }
+    private var monthGrid: some View {
+        let cells = Self.buildMonthCells(year: displayedYear, month: displayedMonth)
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 6) {
+            ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
+                if let day = cell.day, let dateStr = cell.dateString {
+                    dayCell(day: day, dateStr: dateStr)
+                } else {
+                    Color.clear.frame(height: 40)
                 }
             }
         }
-        .padding(14)
-        .vibeCard()
     }
 
-    private func dayCell(dayNum: Int, dateStr: String) -> some View {
-        let matched = entriesForDate(dateStr)
+    private func dayCell(day: Int, dateStr: String) -> some View {
+        let kinds = distinctKinds(for: dateStr)
         let isSelected = dateStr == selectedDateString
         let isToday = dateStr == viewModel.todayAlarm.date
 
         return Button {
-            selectedDateString = dateStr
-            if let first = matched.first {
-                editingEntry = first
-                eventTitleInput = first.title
-                eventKindSelection = first.kind
-            } else {
-                editingEntry = nil
-                eventTitleInput = ""
-                eventKindSelection = .personalLeave
-            }
-            showEditorCard = true
+            selectedDateString = isSelected ? nil : dateStr
         } label: {
-            VStack(spacing: 2) {
-                Text("\(dayNum)")
-                    .font(.system(size: 14, weight: isSelected || isToday ? .bold : .medium, design: .rounded))
-                    .foregroundStyle(
-                        isSelected
-                            ? Color.white
-                            : (isToday ? Color.vibeAccent : Color.primary)
+            VStack(spacing: 3) {
+                Text("\(day)")
+                    .font(.system(size: 15, weight: isToday ? .semibold : .regular))
+                    .monospacedDigit()
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(isSelected ? Color.vibeAccent : Color.clear))
+                    .overlay(
+                        Circle().strokeBorder(
+                            (isToday && !isSelected) ? Color.vibeAccent : Color.clear,
+                            lineWidth: 1.5
+                        )
                     )
 
-                if let primaryEntry = matched.first {
-                    Text(primaryEntry.kind.shortBadge)
-                        .font(.system(size: 9, weight: .bold))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(
-                            Capsule()
-                                .fill(isSelected ? Color.white.opacity(0.25) : badgeColor(for: primaryEntry.kind).opacity(0.15))
-                        )
-                        .foregroundStyle(isSelected ? Color.white : badgeColor(for: primaryEntry.kind))
-                } else {
-                    Text(" ")
-                        .font(.system(size: 9))
+                HStack(spacing: 3) {
+                    ForEach(kinds, id: \.self) { kind in
+                        Circle().fill(dotColor(kind)).frame(width: 5, height: 5)
+                    }
                 }
+                .frame(height: 6)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 42)
-            .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(isSelected ? Color.vibeAccent : (isToday ? Color.vibeAccent.opacity(0.10) : Color(uiColor: .systemGray6).opacity(0.5)))
-            )
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Filter Roller
-
-    private var filterRollerCard: some View {
-        SkeuomorphicHorizontalRoller(
-            title: "FILTER",
-            options: filterOptions,
-            selectedIndex: filterRollerIndex
-        ) { newIdx in
-            filterRollerIndex = newIdx
-        }
-        .padding(10)
-        .vibeCard()
-    }
-
-    // MARK: - Add / Edit Event Card
-
-    private var eventEditorCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(editingEntry == nil ? "New Entry · \(selectedDateString)" : "Edit Entry · \(selectedDateString)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    showEditorCard = false
-                    editingEntry = nil
-                    eventTitleInput = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-
-            TextField("Event name (e.g. Annual Leave)", text: $eventTitleInput)
-                .font(.subheadline)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(Color(uiColor: .systemGray6))
-                )
-
-            HStack(spacing: 8) {
-                ForEach(HolidayEntryKind.allCases, id: \.self) { kind in
-                    let active = eventKindSelection == kind
-                    Button {
-                        eventKindSelection = kind
-                    } label: {
-                        Text(kind.displayTitle)
-                            .font(.caption.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 7)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(active ? badgeColor(for: kind) : Color(uiColor: .systemGray6))
-                            )
-                            .foregroundStyle(active ? Color.white : Color.primary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            HStack(spacing: 10) {
-                Button {
-                    let cleanTitle = eventTitleInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let finalTitle = cleanTitle.isEmpty ? eventKindSelection.displayTitle : cleanTitle
-                    if let existing = editingEntry {
-                        viewModel.updateHolidayEntry(
-                            oldEntry: existing,
-                            newDate: selectedDateString,
-                            newTitle: finalTitle,
-                            newKind: eventKindSelection
-                        )
-                    } else {
-                        viewModel.addManualHolidayEntry(
-                            date: selectedDateString,
-                            title: finalTitle,
-                            kind: eventKindSelection
-                        )
-                    }
-                    showEditorCard = false
-                    editingEntry = nil
-                    eventTitleInput = ""
-                } label: {
-                    Text(editingEntry == nil ? "Save" : "Update")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(Color.vibeAccent)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-                .buttonStyle(.plain)
-
-                if let existing = editingEntry {
-                    Button {
-                        viewModel.deleteHolidayEntry(existing)
-                        showEditorCard = false
-                        editingEntry = nil
-                        eventTitleInput = ""
-                    } label: {
-                        Image(systemName: "trash")
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .background(Color.red.opacity(0.10))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(14)
-        .vibeCard()
+        .accessibilityLabel("\(day)")
     }
 
     // MARK: - Entries List
 
-    private var eventsListCard: some View {
-        let items = filteredEntries
-        return VStack(alignment: .leading, spacing: 4) {
-            Text("THIS MONTH · \(items.count)")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 4)
+    private var listedEntries: [HolidayCalendarEntry] {
+        if let selectedDateString {
+            return viewModel.snapshot.holidayEntries
+                .filter { $0.date == selectedDateString }
+                .sorted { $0.title < $1.title }
+        }
+        let prefix = String(format: "%04d-%02d", displayedYear, displayedMonth)
+        return viewModel.snapshot.holidayEntries
+            .filter { $0.date.hasPrefix(prefix) }
+            .sorted { $0.date < $1.date }
+    }
 
-            VStack(spacing: 0) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, entry in
-                    if index > 0 {
-                        Divider()
-                    }
-                    HStack(spacing: 10) {
-                        Text(entry.kind.shortBadge)
-                            .font(.caption.weight(.bold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(badgeColor(for: entry.kind).opacity(0.14))
-                            )
-                            .foregroundStyle(badgeColor(for: entry.kind))
+    private var listHeaderTitle: String {
+        if let selectedDateString {
+            return Self.monthDayCaption(selectedDateString)
+        }
+        return "\(Self.monthFullNames[displayedMonth - 1]) \(String(displayedYear))"
+    }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(entry.title)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                            Text(entry.date)
-                                .font(.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Button {
-                            selectedDateString = entry.date
-                            editingEntry = entry
-                            eventTitleInput = entry.title
-                            eventKindSelection = entry.kind
-                            showEditorCard = true
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.caption)
-                                .foregroundStyle(.vibeAccent)
-                                .padding(6)
-                                .background(Color.vibeAccent.opacity(0.10))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            viewModel.deleteHolidayEntry(entry)
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                                .padding(6)
-                                .background(Color.red.opacity(0.10))
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.vertical, 8)
+    private func entryRow(_ entry: HolidayCalendarEntry) -> some View {
+        Button {
+            editingEntry = entry
+            showEditorSheet = true
+        } label: {
+            HStack(spacing: 10) {
+                Circle().fill(dotColor(entry.kind)).frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.title)
+                        .foregroundStyle(.primary)
+                    Text("\(Self.monthDayCaption(entry.date)) · \(entry.kind.displayTitle)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                Spacer()
+                Text(entry.source.displayName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(14)
-        .vibeCard()
+        .buttonStyle(.plain)
+        .swipeActions {
+            Button(role: .destructive) {
+                viewModel.deleteHolidayEntry(entry)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 
     // MARK: - Helpers
 
-    private var filteredEntries: [HolidayCalendarEntry] {
-        let prefix = String(format: "%04d-%02d", displayedYear, displayedMonth)
-        let all = viewModel.snapshot.holidayEntries.sorted { a, b in
-            let aInMonth = a.date.hasPrefix(prefix)
-            let bInMonth = b.date.hasPrefix(prefix)
-            if aInMonth != bInMonth { return aInMonth }
-            return a.date < b.date
+    private func distinctKinds(for dateStr: String) -> [HolidayEntryKind] {
+        var seen = Set<HolidayEntryKind>()
+        var result: [HolidayEntryKind] = []
+        for entry in viewModel.snapshot.holidayEntries where entry.date == dateStr {
+            if seen.insert(entry.kind).inserted {
+                result.append(entry.kind)
+            }
         }
-        switch filterRollerIndex {
-        case 1:
-            return all.filter { $0.kind == .publicHoliday }
-        case 2:
-            return all.filter { $0.kind == .makeupWorkday }
-        case 3:
-            return all.filter { $0.kind == .personalLeave }
-        default:
-            return all
-        }
+        return result
     }
 
-    private func entriesForDate(_ dateStr: String) -> [HolidayCalendarEntry] {
-        viewModel.snapshot.holidayEntries.filter { $0.date == dateStr }
-    }
-
-    private func badgeColor(for kind: HolidayEntryKind) -> Color {
+    private func dotColor(_ kind: HolidayEntryKind) -> Color {
         switch kind {
-        case .publicHoliday: return .vibeAccent
-        case .makeupWorkday: return .vibeWork
-        case .personalLeave: return .vibePTO
-        }
-    }
-
-    private func legendDot(label: String, color: Color) -> some View {
-        HStack(spacing: 3) {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        case .publicHoliday: return .red
+        case .makeupWorkday: return .blue
+        case .personalLeave: return .green
         }
     }
 
@@ -458,12 +264,24 @@ public struct HolidayCalendarView: View {
         "July", "August", "September", "October", "November", "December"
     ]
 
+    private static let monthAbbreviations = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    private static func monthDayCaption(_ dateString: String) -> String {
+        let parts = dateString.split(separator: "-")
+        guard parts.count == 3, let month = Int(parts[1]), let day = Int(parts[2]), (1...12).contains(month) else {
+            return dateString
+        }
+        return "\(monthAbbreviations[month - 1]) \(day)"
+    }
+
     private struct MonthDayCell {
         let day: Int?
         let dateString: String?
     }
 
-    private func buildMonthCells(year: Int, month: Int) -> [MonthDayCell] {
+    private static func buildMonthCells(year: Int, month: Int) -> [MonthDayCell] {
         var cal = Calendar(identifier: .gregorian)
         cal.firstWeekday = 2 // Monday, to match the "M T W T F S S" header
         var comps = DateComponents()
@@ -486,5 +304,95 @@ public struct HolidayCalendarView: View {
             cells.append(MonthDayCell(day: d, dateString: dStr))
         }
         return cells
+    }
+}
+
+// MARK: - Add / Edit Entry Sheet
+
+public struct HolidayEntryEditorSheet: View {
+    @ObservedObject var viewModel: AppViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    let existingEntry: HolidayCalendarEntry?
+
+    @State private var title: String
+    @State private var date: Date
+    @State private var kind: HolidayEntryKind
+    @State private var note: String
+
+    public init(viewModel: AppViewModel, initialDateString: String, existingEntry: HolidayCalendarEntry?) {
+        self.viewModel = viewModel
+        self.existingEntry = existingEntry
+        _title = State(initialValue: existingEntry?.title ?? "")
+        _kind = State(initialValue: existingEntry?.kind ?? .personalLeave)
+        _note = State(initialValue: existingEntry?.note ?? "")
+        let engine = AlarmScheduleEngine()
+        let seedDateString = existingEntry?.date ?? initialDateString
+        _date = State(initialValue: engine.date(from: seedDateString) ?? Date())
+    }
+
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Title", text: $title)
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                    Picker("Kind", selection: $kind) {
+                        Text("Holiday").tag(HolidayEntryKind.publicHoliday)
+                        Text("Workday").tag(HolidayEntryKind.makeupWorkday)
+                        Text("Leave").tag(HolidayEntryKind.personalLeave)
+                    }
+                    .pickerStyle(.segmented)
+                    TextField("Note", text: $note, axis: .vertical)
+                }
+
+                if existingEntry != nil {
+                    Section {
+                        Button("Delete Entry", role: .destructive) {
+                            if let existingEntry {
+                                viewModel.deleteHolidayEntry(existingEntry)
+                            }
+                            dismiss()
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                }
+            }
+            .navigationTitle(existingEntry == nil ? "New Entry" : "Edit Entry")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        save()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .tint(.vibeAccent)
+    }
+
+    private func save() {
+        let engine = AlarmScheduleEngine()
+        let dateString = engine.dateString(from: date)
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalTitle = cleanTitle.isEmpty ? kind.displayTitle : cleanTitle
+
+        if let existingEntry {
+            viewModel.updateHolidayEntry(
+                oldEntry: existingEntry,
+                newDate: dateString,
+                newTitle: finalTitle,
+                newKind: kind,
+                newNote: note
+            )
+        } else {
+            viewModel.addManualHolidayEntry(date: dateString, title: finalTitle, kind: kind, note: note)
+        }
+        dismiss()
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - BYOK Provider & Configuration
 
-public enum BYOKProviderKind: String, Codable, CaseIterable, Sendable {
+public enum BYOKProviderKind: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
     case openAICompatible = "openai_compatible"
     case anthropic = "anthropic"
 
