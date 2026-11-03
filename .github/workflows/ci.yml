@@ -102,6 +102,16 @@ jobs:
                 xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
                 local size
                 size=$(stat -f%z "dist/screenshots/$out")
+                if ! app_running; then
+                  echo "::warning::VibeAlarm exited while rendering $mode (attempt $attempt)"
+                  mkdir -p dist/crashes
+                  xcrun simctl spawn "$SIM_UDID" log show --last 2m --style compact \
+                    --predicate 'process == "VibeAlarm" OR eventMessage CONTAINS "com.jstdlee.vibealarm"' \
+                    > "dist/crashes/log-$mode-$attempt.txt" 2>&1 || true
+                  tail -n 60 "dist/crashes/log-$mode-$attempt.txt" || true
+                  rm -f "dist/screenshots/$out"
+                  continue
+                fi
                 if [ "$size" -gt 100000 ]; then
                   echo "Captured $out (attempt $attempt, $size bytes)"
                   return 0
@@ -123,7 +133,7 @@ jobs:
           capture_screen "widget" "05-widgets-and-byok.png"
           ls -lh dist/screenshots/
           mkdir -p dist/crashes
-          cp ~/Library/Logs/DiagnosticReports/*VibeAlarm* dist/crashes/ 2>/dev/null || true
+          cp ~/Library/Logs/DiagnosticReports/*VibeAlarm* ~/Library/Logs/DiagnosticReports/JetsamEvent* dist/crashes/ 2>/dev/null || true
           ls -l dist/crashes/
           if [ "$CAPTURE_FAILED" != "0" ]; then
             for f in dist/crashes/*; do [ -f "$f" ] && head -c 6000 "$f"; done

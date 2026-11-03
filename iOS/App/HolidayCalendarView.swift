@@ -35,7 +35,7 @@ public struct HolidayCalendarView: View {
                 .listRowInsets(EdgeInsets())
 
                 Section {
-                    ForEach(listedEntries) { entry in
+                    ForEach(Array(listedEntries.enumerated()), id: \.offset) { _, entry in
                         entryRow(entry)
                     }
                 } header: {
@@ -125,14 +125,23 @@ public struct HolidayCalendarView: View {
         }
     }
 
+    /// Plain, non-lazy week rows. A LazyVGrid inside a self-sizing List row can
+    /// trigger an endless layout pass, so the grid is built from fixed rows instead.
     private var monthGrid: some View {
-        let cells = Self.buildMonthCells(year: displayedYear, month: displayedMonth)
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 6) {
-            ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
-                if let day = cell.day, let dateStr = cell.dateString {
-                    dayCell(day: day, dateStr: dateStr)
-                } else {
-                    Color.clear.frame(height: 40)
+        let weeks = Self.buildMonthWeeks(year: displayedYear, month: displayedMonth)
+        return VStack(spacing: 6) {
+            ForEach(weeks.indices, id: \.self) { weekIndex in
+                HStack(spacing: 2) {
+                    ForEach(0..<7, id: \.self) { column in
+                        let cell = weeks[weekIndex][column]
+                        if let day = cell.day, let dateStr = cell.dateString {
+                            dayCell(day: day, dateStr: dateStr)
+                        } else {
+                            Color.clear
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 40)
+                        }
+                    }
                 }
             }
         }
@@ -168,6 +177,8 @@ public struct HolidayCalendarView: View {
                 .frame(height: 6)
             }
             .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(day)")
@@ -306,6 +317,15 @@ public struct HolidayCalendarView: View {
             cells.append(MonthDayCell(day: d, dateString: dStr))
         }
         return cells
+    }
+
+    /// Splits the month cells into full weeks of exactly seven cells each.
+    private static func buildMonthWeeks(year: Int, month: Int) -> [[MonthDayCell]] {
+        var cells = buildMonthCells(year: year, month: month)
+        while cells.count % 7 != 0 {
+            cells.append(MonthDayCell(day: nil, dateString: nil))
+        }
+        return stride(from: 0, to: cells.count, by: 7).map { Array(cells[$0..<($0 + 7)]) }
     }
 }
 
