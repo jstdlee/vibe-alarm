@@ -60,7 +60,7 @@ capture_screen() {
         rm -f "$OUT_DIR/$out"
         continue
       fi
-      if [ "$size" -gt 100000 ]; then
+      if [ "$size" -gt 60000 ]; then
         echo "Captured $out (attempt $attempt, $size bytes)"
         return 0
       fi

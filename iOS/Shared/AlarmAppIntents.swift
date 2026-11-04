@@ -22,8 +22,8 @@ public struct SkipTomorrowIntent: AppIntent {
 }
 
 public struct DelayTomorrow30Intent: AppIntent {
-    public static var title: LocalizedStringResource = "Delay Tomorrow's Alarm 30 Minutes"
-    public static var description = IntentDescription("Delays tomorrow's alarm by 30 minutes. The day after tomorrow automatically restores the original time.")
+    public static var title: LocalizedStringResource = "Delay Tomorrow's Alarm 10 Minutes"
+    public static var description = IntentDescription("Delays tomorrow's alarm by 10 minutes; each tap adds 10 more. The day after tomorrow automatically restores the original time.")
     public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -34,9 +34,9 @@ public struct DelayTomorrow30Intent: AppIntent {
         let baseDelay: Int
         if let override = current.nextDayOverride,
            case .delayTomorrow(let existing) = override.action {
-            baseDelay = existing + 30
+            baseDelay = existing + 10
         } else {
-            baseDelay = 30
+            baseDelay = 10
         }
         let snapshot = try store.setTomorrowOverride(action: .delayTomorrow(minutes: baseDelay))
         await AlarmNotificationScheduler.syncNotifications(for: snapshot)
@@ -110,9 +110,9 @@ public struct VibeAlarmShortcutsProvider: AppShortcutsProvider {
             intent: DelayTomorrow30Intent(),
             phrases: [
                 "Delay tomorrow's alarm half an hour with \(.applicationName)",
-                "Make tomorrow's \(.applicationName) alarm 30 minutes later"
+                "Make tomorrow's \(.applicationName) alarm 10 minutes later"
             ],
-            shortTitle: "Delay +30m",
+            shortTitle: "Delay +10m",
             systemImageName: "clock.arrow.circlepath"
         )
         AppShortcut(

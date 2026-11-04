@@ -146,12 +146,12 @@ public struct MediumWidgetContentView: View {
                     .buttonStyle(.plain)
 
                     Button(intent: DelayTomorrow30Intent()) {
-                        WidgetKeyLabel(title: "+30 min", active: true)
+                        WidgetKeyLabel(title: "+10 min", active: true)
                     }
                     .buttonStyle(.plain)
                 } else {
                     WidgetKeyLabel(title: "Skip", active: false)
-                    WidgetKeyLabel(title: "+30 min", active: false)
+                    WidgetKeyLabel(title: "+10 min", active: false)
                 }
 
                 if tomorrow.hasManualOverride {
