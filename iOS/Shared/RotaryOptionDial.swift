@@ -130,23 +130,16 @@ public struct RotaryOptionDial: View {
 
     private func optionLabels(metrics: RotaryDialMetrics) -> some View {
         ForEach(visibleIndices, id: \.self) { idx in
-            let delta = Double(idx - selectedIndex)
-            let angle = -90.0 + delta * stepAngleDegrees
-            let position = metrics.point(angleDegrees: angle, radius: metrics.labelRadius)
-            let distance = abs(delta)
-            let isSelected = idx == selectedIndex
-
-            Text(options[idx])
-                .font(.system(size: isSelected ? 17 : 14, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? Color.vibeAccent : Color.dialInk.opacity(0.7))
-                .lineLimit(1)
-                .fixedSize()
-                .scaleEffect(max(0.82, 1 - distance * 0.1))
-                .opacity(max(0.0, 1 - distance * 0.34))
-                .position(position)
-                .onTapGesture {
-                    commit(idx)
-                }
+            let delta: Double = Double(idx - selectedIndex)
+            let angle: Double = -90.0 + delta * stepAngleDegrees
+            let position: CGPoint = metrics.point(angleDegrees: angle, radius: metrics.labelRadius)
+            RotaryOptionLabel(
+                title: options[idx],
+                isSelected: idx == selectedIndex,
+                stepDistance: abs(delta),
+                position: position,
+                onTap: { commit(idx) }
+            )
         }
     }
 
@@ -205,6 +198,50 @@ public struct RotaryOptionDial: View {
         let generator = UISelectionFeedbackGenerator()
         generator.selectionChanged()
         onSelect(newIndex)
+    }
+}
+
+// MARK: - Option Label
+
+/// One engraved option label. Kept as a separate view so the compiler can type-check each
+/// modifier chain in isolation (the inline version timed out in CI).
+private struct RotaryOptionLabel: View {
+    let title: String
+    let isSelected: Bool
+    let stepDistance: Double
+    let position: CGPoint
+    let onTap: () -> Void
+
+    private var fontSize: CGFloat {
+        isSelected ? 17 : 14
+    }
+
+    private var weight: Font.Weight {
+        isSelected ? .semibold : .regular
+    }
+
+    private var tint: Color {
+        isSelected ? Color.vibeAccent : Color.dialInk.opacity(0.7)
+    }
+
+    private var scale: CGFloat {
+        CGFloat(max(0.82, 1.0 - stepDistance * 0.1))
+    }
+
+    private var labelOpacity: Double {
+        max(0.0, 1.0 - stepDistance * 0.34)
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: fontSize, weight: weight))
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .fixedSize()
+            .scaleEffect(scale)
+            .opacity(labelOpacity)
+            .position(position)
+            .onTapGesture(perform: onTap)
     }
 }
 
