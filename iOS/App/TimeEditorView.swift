@@ -2,8 +2,8 @@ import SwiftUI
 import VibeAlarmCore
 
 /// The wake time editor: a large centered time readout over a calm, full-bleed background,
-/// the two semicircular rotary dials in the thumb zone, and a stack of compact rotary option
-/// dials for Repeat, Holiday Rule and Snooze. Edits to the alarm rule are local until "Save"
+/// a stack of compact rotary option dials, and the two semicircular hour/minute dials
+/// pinned in the lower thumb zone. Option dials cover for Repeat, Holiday Rule and Snooze. Edits to the alarm rule are local until "Save"
 /// is tapped; "Cancel" discards them. Snooze is a standalone preference and applies immediately.
 public struct TimeEditorView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -16,19 +16,13 @@ public struct TimeEditorView: View {
     @State private var customDaysSelection: Set<Weekday>
     @State private var onceDate: Date
 
-    /// When true, the hero hour/minute dials are omitted and only the Repeat / Holiday Rule /
-    /// Snooze option dials are shown, so all three fit on a 6.1-inch screen without scrolling.
-    /// Used by the "snooze" UI-preview screenshot mode.
-    private let optionsOnly: Bool
-
     private let repeatOptions = ["Weekdays", "Every Day", "Weekends", "Custom", "Once"]
     private let holidayOptions = ["Smart", "Always Ring"]
     private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
     private let weekOrder: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday]
 
-    public init(viewModel: AppViewModel, optionsOnly: Bool = false) {
+    public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
-        self.optionsOnly = optionsOnly
         let rule = viewModel.snapshot.alarmRule
         _hour = State(initialValue: rule.hour)
         _minute = State(initialValue: rule.minute)
@@ -68,25 +62,15 @@ public struct TimeEditorView: View {
         .tint(.vibeAccent)
     }
 
-    @ViewBuilder
+    /// Layout, top to bottom: time readout, the option-dial stack (the only part that may
+    /// scroll, on short screens), and the hour/minute dials pinned in the lower thumb zone.
+    /// Budget on 393 x 852 pt: ~715 pt usable; readout ~100 + options ~320 + dials 240 = ~660,
+    /// so nothing scrolls. On 375 x 667 pt only the option stack scrolls.
     private var content: some View {
-        if optionsOnly {
-            optionsOnlyContent
-                .background(calmBackground)
-        } else {
-            fullEditorContent
-                .background(calmBackground)
-        }
-    }
-
-    private var fullEditorContent: some View {
         VStack(spacing: 0) {
             timeReadoutHeader
                 .padding(.top, 6)
                 .padding(.bottom, 2)
-
-            dialsZone
-                .frame(height: 240)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
@@ -100,32 +84,15 @@ public struct TimeEditorView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
+                .padding(.vertical, 12)
             }
+            .scrollBounceBehavior(.basedOnSize)
+
+            dialsZone
+                .frame(height: 240)
+                .padding(.bottom, 8)
         }
-    }
-
-    /// Compact layout that shows the three option dials (Repeat, Holiday Rule, Snooze) and the
-    /// time readout, all fully visible without scrolling on a 393 x 852 pt screen.
-    private var optionsOnlyContent: some View {
-        VStack(spacing: 20) {
-            timeReadoutHeader
-                .padding(.top, 8)
-
-            optionDialsSection
-
-            if case .customDays = repeatMode {
-                customWeekdaysRow
-            }
-            if case .specificDates = repeatMode {
-                oncePickerRow
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+        .background(calmBackground)
     }
 
     // MARK: - Calm Background

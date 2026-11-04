@@ -56,8 +56,8 @@ struct VibeAlarmApp: App {
             // Preset query surfaces several countries including Singapore, which the demo
             // view model subscribes to so a checkmark state is visible.
             HolidayCatalogSearchSheet(viewModel: viewModel, initialQuery: "si")
-        case "snooze":
-            TimeEditorView(viewModel: viewModel, optionsOnly: true)
+        case "editor":
+            TimeEditorView(viewModel: viewModel)
         default:
             MainTabView(viewModel: viewModel, initialTab: .dashboard)
         }

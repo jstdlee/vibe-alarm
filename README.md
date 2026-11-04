@@ -26,7 +26,7 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
 
 <p align="center">
   <img src="docs/screenshots/06-holiday-country-search.png" width="19%" alt="Add Holidays Country Search">
-  <img src="docs/screenshots/07-repeat-holiday-snooze-dials.png" width="19%" alt="Repeat, Holiday Rule and Snooze Dials">
+  <img src="docs/screenshots/07-full-wake-time-editor.png" width="19%" alt="Repeat, Holiday Rule and Snooze Dials">
 </p>
 
 | 1. Alarm (`TwoDayDashboardView`) | 2. Wake Time (`TimeEditorView`) |
@@ -46,8 +46,8 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
 
 | 6. Add Holidays (`HolidayCatalogSearchSheet`) | 7. Option Dials (`RotaryOptionDial`) |
 | :---: | :---: |
-| <img src="docs/screenshots/06-holiday-country-search.png" width="88%" alt="Searchable Holiday Catalog"> | <img src="docs/screenshots/07-repeat-holiday-snooze-dials.png" width="88%" alt="Repeat, Holiday Rule and Snooze Option Dials"> |
-| A searchable catalog of 53 national public holiday feeds. Type a country name or code, tap `Add`, and the feed joins the Sources list as a normal `.ics` subscription. | Repeat, holiday rule and snooze use the same rotary language as the time dials instead of dropdowns or rollers. |
+| <img src="docs/screenshots/06-holiday-country-search.png" width="88%" alt="Searchable Holiday Catalog"> | <img src="docs/screenshots/07-full-wake-time-editor.png" width="88%" alt="Repeat, Holiday Rule and Snooze Option Dials"> |
+| A searchable catalog of 53 national public holiday feeds. Type a country name or code, tap `Add`, and the feed joins the Sources list as a normal `.ics` subscription. | The full wake time editor: Repeat, Holiday Rule and Snooze option dials above, with the hour and minute half-dials pinned in the lower thumb zone on every screen size. |
 
 ---
 
