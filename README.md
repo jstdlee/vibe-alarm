@@ -1,79 +1,74 @@
 # VibeAlarm
 
-**A 100% on-device, privacy-first iOS alarm built in genuine Apple Human Interface Guidelines style, that understands public holidays, weekend makeup workdays, and personal leave.**
+**A 100% on-device, privacy-first iOS alarm that understands public holidays, weekend makeup workdays and personal leave.**
 
 [![CI](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml/badge.svg)](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml)
-![iOS 17.0+](https://img.shields.io/badge/iOS-17.0%2B-F5F5F7?logo=apple&logoColor=black)
-![SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%C2%B7%20WidgetKit-FF5500?logo=swift)
+![iOS 17.0+](https://img.shields.io/badge/iOS-17.0%2B-E8E2D8?logo=apple&logoColor=black)
+![SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%C2%B7%20WidgetKit-B4622D?logo=swift)
 
-> **Design principles**: native `List`/`Form` with the `.insetGrouped` style, system semantic colors (`Color(.systemGroupedBackground)`, `.primary`, `.secondary`), and exactly one accent color (system orange). No gradients, no badges, no decorative chrome.
-> - **Two skeuomorphic controls, and only two**: a pair of semicircular rotary dials (`SemicircleDial`) anchored to the left and right screen edges for picking the hour and minute, and horizontal thumbwheel rollers (`ThumbwheelRoller`) that replace dropdown menus for repeat mode and holiday policy.
-> - **Built-in calendar & events manager**, **external `.ics` subscriptions**, and **iOS Calendar (`EventKit`) access settings** are all reachable from the bottom tab bar, with every byte of data staying in the on-device App Group sandbox.
+> **Design language: machined matte volumes.** A warm plaster paper ground, matte discs that sit in a recessed well and cast one soft shadow from a single light source, engraved hairline grooves, and exactly one accent — a warm amber used for the active index and the single primary action. Depth comes from shadow and well, never from borders or glass. Motion is weighted: a dial turns like a heavy object.
 
 ---
 
-## iOS Simulator Screenshots (Apple Light Theme)
+## iOS Simulator Screenshots
 
-Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appearance against a real build of `VibeAlarm.app`:
+Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`, in light appearance. The same seven screens are also captured on a 375 x 667 phone (`docs/screenshots/small/`).
 
 <p align="center">
-  <img src="docs/screenshots/01-two-day-dashboard.png" width="19%" alt="Two-Day Dashboard">
-  <img src="docs/screenshots/02-dual-thumb-dial.png" width="19%" alt="Wake Time Editor">
-  <img src="docs/screenshots/03-builtin-calendar-events.png" width="19%" alt="Built-in Calendar & Events">
-  <img src="docs/screenshots/04-external-and-ios-calendar-settings.png" width="19%" alt="External & iOS Calendar Settings">
-  <img src="docs/screenshots/05-widgets-and-byok.png" width="19%" alt="Home Screen Widgets">
+  <img src="docs/screenshots/01-alarms.png" width="19%" alt="Alarms">
+  <img src="docs/screenshots/02-wake-time-editor.png" width="19%" alt="Wake Time">
+  <img src="docs/screenshots/03-calendar.png" width="19%" alt="Calendar">
+  <img src="docs/screenshots/04-sources.png" width="19%" alt="Sources">
+  <img src="docs/screenshots/05-widgets.png" width="19%" alt="Widgets">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/06-holiday-country-search.png" width="19%" alt="Add Holidays Country Search">
-  <img src="docs/screenshots/07-full-wake-time-editor.png" width="19%" alt="Repeat, Holiday Rule and Snooze Dials">
+  <img src="docs/screenshots/06-holiday-catalog.png" width="19%" alt="Add Holidays">
+  <img src="docs/screenshots/07-parse-notice.png" width="19%" alt="Parse Notice">
 </p>
 
-| 1. Alarm (`TwoDayDashboardView`) | 2. Wake Time (`TimeEditorView`) |
+| 1. Alarms | 2. Wake Time |
 | :---: | :---: |
-| <img src="docs/screenshots/01-two-day-dashboard.png" width="88%" alt="Alarm Tab Light Theme"> | <img src="docs/screenshots/02-dual-thumb-dial.png" width="88%" alt="Semicircle Dials & Thumbwheel Rollers"> |
-| A plain `List` shows **Today** and **Tomorrow** with the effective wake time in large light digits, or `Off` / `Skipped`, plus a short reason line when relevant (a holiday, a makeup workday, a delay). `Skip` / `+30 min` / `Restore` apply to tomorrow only and restore automatically the day after. | The signature interaction: two `SemicircleDial` half-discs anchored to the screen edges for the hour and minute, plus three compact `RotaryOptionDial` controls for repeat mode (`Workdays` / `Every Day` / `Weekends` / `Custom` / `Once`), holiday rule (`Smart` / `Always Ring`) and the snooze interval (`5` / `8` / `10` / `15` / `20` minutes, default `8`). |
+| <img src="docs/screenshots/01-alarms.png" width="88%" alt="Alarms list"> | <img src="docs/screenshots/02-wake-time-editor.png" width="88%" alt="Wake time editor"> |
+| The home screen is an alarms list. Above it sit three machined quick keys — `Skip`, `+10 min`, `Restore` — that act on tomorrow only. Each row shows the alarm's large time, its repeat summary, today and tomorrow's effective state, and a real toggle. | Two large engraved discs fill the lower half for the hour and the minute, sized for a thumb on each edge. Repeat, Holiday Rule and Snooze are horizontal rotary controls with the caption set into the bottom middle of the control itself, not a title row above it. |
 
-| 3. Calendar (`HolidayCalendarView`) | 4. Sources (`SettingsView`) |
+| 3. Calendar | 4. Sources |
 | :---: | :---: |
-| <img src="docs/screenshots/03-builtin-calendar-events.png" width="88%" alt="Built-in Calendar & Events Manager"> | <img src="docs/screenshots/04-external-and-ios-calendar-settings.png" width="88%" alt="External ICS & iOS EventKit Calendar Settings"> |
-| A custom month grid marks each day with a small colored dot (red = public holiday, blue = makeup workday, green = personal leave). Tap a day to filter the native list below it; swipe to delete, tap to edit, or import entries from pasted text with the on-device AI parser. | iOS Calendar (`EventKit`) access status and per-calendar toggles, editable leave keywords, `.ics` subscription toggles for statutory holiday feeds, and the BYOK AI provider / model / Keychain-backed API key settings — all in native `Form` sections. |
+| <img src="docs/screenshots/03-calendar.png" width="88%" alt="Calendar"> | <img src="docs/screenshots/04-sources.png" width="88%" alt="Sources"> |
+| A month grid marks each day in the same engraved language: an amber dot for a public holiday, a ring for a makeup workday, a dash for personal leave. Tap a day to filter the entries below; add, edit or delete any entry. | Holiday feeds, each with a toggle, plus `Add Country` into the searchable catalog, a custom `.ics` URL, and a refresh. iOS Calendar access is read-only with one toggle per calendar. Everything that is on or off is a plain toggle, never a dial. |
 
-| 5. Widgets (`WidgetGalleryView`) |
-| :---: |
-| <img src="docs/screenshots/05-widgets-and-byok.png" width="44%" alt="Small and Medium Home Screen Widgets"> |
-| The small and medium Home Screen widgets, reusing the exact SwiftUI views from `iOS/Shared/WidgetViews.swift`. The medium widget shows both days with interactive `Skip` / `+30 min` / `Restore` buttons — no need to open the app. A nightly bedtime reminder notification previews tomorrow's status with the same one-tap actions available via long-press. |
-
-| 6. Add Holidays (`HolidayCatalogSearchSheet`) | 7. Option Dials (`RotaryOptionDial`) |
+| 5. Widgets | 6. Add Holidays |
 | :---: | :---: |
-| <img src="docs/screenshots/06-holiday-country-search.png" width="88%" alt="Searchable Holiday Catalog"> | <img src="docs/screenshots/07-full-wake-time-editor.png" width="88%" alt="Repeat, Holiday Rule and Snooze Option Dials"> |
-| A searchable catalog of 53 national public holiday feeds. Type a country name or code, tap `Add`, and the feed joins the Sources list as a normal `.ics` subscription. | The full wake time editor: Repeat, Holiday Rule and Snooze option dials above, with the hour and minute half-dials pinned in the lower thumb zone on every screen size. |
+| <img src="docs/screenshots/05-widgets.png" width="88%" alt="Widgets"> | <img src="docs/screenshots/06-holiday-catalog.png" width="88%" alt="Add Holidays"> |
+| Small and medium Home Screen widgets built from the same shared views, with interactive `Skip`, `+10 min` and `Restore` buttons. A bedtime notification previews tomorrow with the same one-tap actions. | A catalog of 54 national public holiday feeds. Search by country name or code and tap `Add`; the feed becomes an ordinary `.ics` subscription. |
+
+<img src="docs/screenshots/07-parse-notice.png" width="40%" alt="Parse Notice">
+
+Paste a leave notice or an HR email. The on-device parser (or your own API key, if you set one) turns it into dated entries — personal leave, public holiday, makeup workday — before anything is saved.
 
 ---
 
 ## Core Features
 
-1. **Two reusable skeuomorphic controls, used nowhere else** (`iOS/Shared/SemicircleDial.swift`, `iOS/Shared/ThumbwheelRoller.swift`):
-   - `SemicircleDial` — a half-disc rotary dial anchored to a screen edge, rotated with a circular drag gesture, with fine tick marks and a fixed orange index notch. Used for the hour (0–23) and minute (0–59).
-   - `RotaryOptionDial` — a compact dial for a small set of named options, with the current value at the index notch and neighbors curving away. Used for repeat mode, holiday rule and snooze interval.
-   - `ThumbwheelRoller` — a horizontal cylinder of text options with the center value bold and neighbors fading toward the edges, used where a long list of values has to stay compact.
-2. **Built-in calendar & events manager** (`HolidayCalendarView`):
-   - Month grid with colored day markers, full CRUD (title, date, kind, note) for holidays, makeup workdays, and personal leave, plus a BYOK AI notice parser.
-3. **External `.ics` subscriptions & iOS Calendar (`EventKit`) access** (`SettingsView`):
-   - On-device, read-only `EventKit` scanning of selected local/iCloud/Exchange calendars against custom leave keywords (`PTO`, `Leave`, `Vacation`, `Annual Leave`, `Day Off`, `Sick Leave`).
-   - Built-in China statutory holiday feed (including makeup workdays, which the Google feeds do not carry) and Singapore MOM public holidays, a searchable catalog of 53 national public holiday feeds, plus any custom `.ics` / `webcal` link. Google holiday feeds are classified so observances and regional-only days do not silently skip a workday.
-4. **Snooze interval** — persisted in the shared store, default `8` minutes, used by the notification snooze action and the scheduling engine.
-5. **One-tap next-day override, auto-restoring** (`NextDayOverride`):
-   - `Skip` or delay tomorrow's alarm in one tap; the override is scoped to a single date (`targetDate = YYYY-MM-DD`) and automatically expires the day after, restoring the normal schedule.
+1. **Alarms list with next-day quick keys** — `Skip`, `+10 min` and `Restore` apply to tomorrow only and clear themselves the day after.
+2. **Skeuomorphic controls used sparingly and consistently** (`iOS/Shared`):
+   - `MachinedDisc` — the large engraved disc used for the hour and the minute.
+   - `CompactRoller` — a horizontal rotary control whose caption sits at the bottom middle of the control, used for repeat mode, holiday rule and snooze interval.
+3. **Three-source holiday engine, all on device**:
+   - External `.ics` subscriptions, including China's statutory holidays and makeup workdays, Singapore MOM, and a searchable catalog of 54 national feeds. Google feeds are classified so observances and regional-only days do not silently skip a workday.
+   - Read-only `EventKit` scanning of chosen calendars against leave keywords.
+   - A BYOK parser for pasted notices, with an offline rule-based fallback and the key held in the iOS Keychain.
+4. **Snooze interval** — stored in the shared App Group store, default `8` minutes, used by the notification snooze action and the scheduler.
+5. **Privacy** — no backend, no account, no analytics. Alarm rules, overrides and calendar entries live in the App Group sandbox; events never leave the phone.
 
 ---
 
 ## Architecture
 
-- **`VibeAlarmCore`** — a dependency-free Swift package with the scheduling engine (`AlarmScheduleEngine`), models, the zero-network `.ics` parser (`ICSHolidayParser`), the BYOK LLM + offline natural-language holiday extractor (`BYOKHolidayService`), and the shared App Group persistence layer (`SharedAlarmStore`). Fully unit tested.
-- **`iOS/App`** — the SwiftUI app target: three tabs (`Alarm`, `Calendar`, `Sources`), the wake time editor (`TimeEditorView`), the view model (`AppViewModel`), on-device `EventKit` access (`LocalCalendarManager`), and Keychain storage (`KeychainHelper`).
-- **`iOS/Shared`** — code shared between the app and the widget extension: the skeuomorphic controls (`SemicircleDial`, `RotaryOptionDial`, `ThumbwheelRoller`), the pure SwiftUI widget views (`WidgetViews.swift`), `AppIntents` for Siri/Shortcuts/interactive widget actions, the notification scheduler, and app-wide constants.
-- **`iOS/Widget`** — the WidgetKit extension with `SystemSmall` and `SystemMedium` Home Screen widgets, built from the shared widget views.
+- **`VibeAlarmCore`** — a dependency-free Swift package: scheduling engine, models, `.ics` parser, holiday catalog, BYOK service, shared store. Unit tested.
+- **`iOS/App`** — the SwiftUI app: `AlarmListView`, `TimeEditorView`, `HolidayCalendarView`, `SettingsView`, `HolidayCatalogSearchSheet`, `BYOKInputSheet`.
+- **`iOS/Shared`** — controls, widget views, App Intents for Siri and Shortcuts, and the notification scheduler.
+- **`iOS/Widget`** — the WidgetKit extension with small and medium widgets.
 
 ## Build & Test
 
@@ -81,16 +76,14 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
 git clone https://github.com/jstdlee/vibe-alarm.git
 cd vibe-alarm
 
-# Run the VibeAlarmCore unit tests
 swift test --package-path VibeAlarmCore
 
-# Generate the Xcode project and open it
 brew install xcodegen
 xcodegen generate
 open VibeAlarm.xcodeproj
 ```
 
-GitHub Actions (`macos-26` + Xcode) runs the `VibeAlarmCore` unit tests, builds the app and widget extension, captures real iOS Simulator screenshots in light mode, and packages an unsigned `.ipa` on every push. Download the `VibeAlarm-unsigned-ipa` artifact from the [CI workflow](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml) to sideload with AltStore, SideStore, Sideloadly, TrollStore, or a personal Apple developer certificate.
+GitHub Actions (`macos-26` + Xcode) runs the core tests, builds the app and widget extension, captures real Simulator screenshots on two screen sizes, and packages an unsigned `.ipa`. Download the `VibeAlarm-unsigned-ipa` artifact from the [CI workflow](https://github.com/jstdlee/vibe-alarm/actions/workflows/ci.yml) to sideload it.
 
 ---
 
