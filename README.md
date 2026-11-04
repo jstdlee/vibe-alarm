@@ -24,10 +24,15 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
   <img src="docs/screenshots/05-widgets-and-byok.png" width="19%" alt="Home Screen Widgets">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/06-holiday-country-search.png" width="19%" alt="Add Holidays Country Search">
+  <img src="docs/screenshots/07-repeat-holiday-snooze-dials.png" width="19%" alt="Repeat, Holiday Rule and Snooze Dials">
+</p>
+
 | 1. Alarm (`TwoDayDashboardView`) | 2. Wake Time (`TimeEditorView`) |
 | :---: | :---: |
 | <img src="docs/screenshots/01-two-day-dashboard.png" width="88%" alt="Alarm Tab Light Theme"> | <img src="docs/screenshots/02-dual-thumb-dial.png" width="88%" alt="Semicircle Dials & Thumbwheel Rollers"> |
-| A plain `List` shows **Today** and **Tomorrow** with the effective wake time in large light digits, or `Off` / `Skipped`, plus a short reason line when relevant (a holiday, a makeup workday, a delay). `Skip` / `+30 min` / `Restore` apply to tomorrow only and restore automatically the day after. | The signature interaction: two `SemicircleDial` half-discs anchored to the screen edges for the hour and minute, and two `ThumbwheelRoller` rows below for repeat mode (`Workdays` / `Every Day` / `Weekends` / `Custom` / `Once`) and holiday rule (`Smart` / `Always Ring`). |
+| A plain `List` shows **Today** and **Tomorrow** with the effective wake time in large light digits, or `Off` / `Skipped`, plus a short reason line when relevant (a holiday, a makeup workday, a delay). `Skip` / `+30 min` / `Restore` apply to tomorrow only and restore automatically the day after. | The signature interaction: two `SemicircleDial` half-discs anchored to the screen edges for the hour and minute, plus three compact `RotaryOptionDial` controls for repeat mode (`Workdays` / `Every Day` / `Weekends` / `Custom` / `Once`), holiday rule (`Smart` / `Always Ring`) and the snooze interval (`5` / `8` / `10` / `15` / `20` minutes, default `8`). |
 
 | 3. Calendar (`HolidayCalendarView`) | 4. Sources (`SettingsView`) |
 | :---: | :---: |
@@ -39,19 +44,26 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
 | <img src="docs/screenshots/05-widgets-and-byok.png" width="44%" alt="Small and Medium Home Screen Widgets"> |
 | The small and medium Home Screen widgets, reusing the exact SwiftUI views from `iOS/Shared/WidgetViews.swift`. The medium widget shows both days with interactive `Skip` / `+30 min` / `Restore` buttons — no need to open the app. A nightly bedtime reminder notification previews tomorrow's status with the same one-tap actions available via long-press. |
 
+| 6. Add Holidays (`HolidayCatalogSearchSheet`) | 7. Option Dials (`RotaryOptionDial`) |
+| :---: | :---: |
+| <img src="docs/screenshots/06-holiday-country-search.png" width="88%" alt="Searchable Holiday Catalog"> | <img src="docs/screenshots/07-repeat-holiday-snooze-dials.png" width="88%" alt="Repeat, Holiday Rule and Snooze Option Dials"> |
+| A searchable catalog of 53 national public holiday feeds. Type a country name or code, tap `Add`, and the feed joins the Sources list as a normal `.ics` subscription. | Repeat, holiday rule and snooze use the same rotary language as the time dials instead of dropdowns or rollers. |
+
 ---
 
 ## Core Features
 
 1. **Two reusable skeuomorphic controls, used nowhere else** (`iOS/Shared/SemicircleDial.swift`, `iOS/Shared/ThumbwheelRoller.swift`):
    - `SemicircleDial` — a half-disc rotary dial anchored to a screen edge, rotated with a circular drag gesture, with fine tick marks and a fixed orange index notch. Used for the hour (0–23) and minute (0–59).
-   - `ThumbwheelRoller` — a horizontal cylinder of text options with the center value bold and neighbors fading toward the edges. Replaces dropdowns for repeat mode and holiday rule.
+   - `RotaryOptionDial` — a compact dial for a small set of named options, with the current value at the index notch and neighbors curving away. Used for repeat mode, holiday rule and snooze interval.
+   - `ThumbwheelRoller` — a horizontal cylinder of text options with the center value bold and neighbors fading toward the edges, used where a long list of values has to stay compact.
 2. **Built-in calendar & events manager** (`HolidayCalendarView`):
    - Month grid with colored day markers, full CRUD (title, date, kind, note) for holidays, makeup workdays, and personal leave, plus a BYOK AI notice parser.
 3. **External `.ics` subscriptions & iOS Calendar (`EventKit`) access** (`SettingsView`):
    - On-device, read-only `EventKit` scanning of selected local/iCloud/Exchange calendars against custom leave keywords (`PTO`, `Leave`, `Vacation`, `Annual Leave`, `Day Off`, `Sick Leave`).
-   - Built-in China statutory holiday and Singapore MOM public holiday feeds, plus any custom `.ics` / `webcal` link.
-4. **One-tap next-day override, auto-restoring** (`NextDayOverride`):
+   - Built-in China statutory holiday feed (including makeup workdays, which the Google feeds do not carry) and Singapore MOM public holidays, a searchable catalog of 53 national public holiday feeds, plus any custom `.ics` / `webcal` link. Google holiday feeds are classified so observances and regional-only days do not silently skip a workday.
+4. **Snooze interval** — persisted in the shared store, default `8` minutes, used by the notification snooze action and the scheduling engine.
+5. **One-tap next-day override, auto-restoring** (`NextDayOverride`):
    - `Skip` or delay tomorrow's alarm in one tap; the override is scoped to a single date (`targetDate = YYYY-MM-DD`) and automatically expires the day after, restoring the normal schedule.
 
 ---
@@ -60,7 +72,7 @@ Captured by GitHub Actions on `macos-26` running the iOS Simulator in light appe
 
 - **`VibeAlarmCore`** — a dependency-free Swift package with the scheduling engine (`AlarmScheduleEngine`), models, the zero-network `.ics` parser (`ICSHolidayParser`), the BYOK LLM + offline natural-language holiday extractor (`BYOKHolidayService`), and the shared App Group persistence layer (`SharedAlarmStore`). Fully unit tested.
 - **`iOS/App`** — the SwiftUI app target: three tabs (`Alarm`, `Calendar`, `Sources`), the wake time editor (`TimeEditorView`), the view model (`AppViewModel`), on-device `EventKit` access (`LocalCalendarManager`), and Keychain storage (`KeychainHelper`).
-- **`iOS/Shared`** — code shared between the app and the widget extension: the two skeuomorphic controls, the pure SwiftUI widget views (`WidgetViews.swift`), `AppIntents` for Siri/Shortcuts/interactive widget actions, the notification scheduler, and app-wide constants.
+- **`iOS/Shared`** — code shared between the app and the widget extension: the skeuomorphic controls (`SemicircleDial`, `RotaryOptionDial`, `ThumbwheelRoller`), the pure SwiftUI widget views (`WidgetViews.swift`), `AppIntents` for Siri/Shortcuts/interactive widget actions, the notification scheduler, and app-wide constants.
 - **`iOS/Widget`** — the WidgetKit extension with `SystemSmall` and `SystemMedium` Home Screen widgets, built from the shared widget views.
 
 ## Build & Test
