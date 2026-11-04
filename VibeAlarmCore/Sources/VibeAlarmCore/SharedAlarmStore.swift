@@ -3,7 +3,9 @@ import Foundation
 // MARK: - Complete Persisted Snapshot Shared by App & Widget Extension
 
 public struct VibeAlarmSnapshot: Codable, Equatable, Sendable {
-    public var alarmRule: AlarmRule
+    /// Every configured alarm. The product is a small list, not a single rule: a work alarm
+    /// and a weekend alarm rarely share a time, and the home screen presents them as rows.
+    public var alarmRules: [AlarmRule]
     public var nextDayOverride: NextDayOverride?
     public var holidayEntries: [HolidayCalendarEntry]
     public var subscriptions: [ExternalCalendarSubscription]
@@ -13,7 +15,7 @@ public struct VibeAlarmSnapshot: Codable, Equatable, Sendable {
     public var updatedAt: Date
 
     public init(
-        alarmRule: AlarmRule = AlarmRule(),
+        alarmRules: [AlarmRule] = [AlarmRule()],
         nextDayOverride: NextDayOverride? = nil,
         holidayEntries: [HolidayCalendarEntry] = BuiltinHolidays.entries2026,
         subscriptions: [ExternalCalendarSubscription] = ExternalCalendarSubscription.defaultPresets,
@@ -22,7 +24,7 @@ public struct VibeAlarmSnapshot: Codable, Equatable, Sendable {
         byokConfig: BYOKConfiguration = BYOKConfiguration(),
         updatedAt: Date = Date()
     ) {
-        self.alarmRule = alarmRule
+        self.alarmRules = alarmRules.isEmpty ? [AlarmRule()] : alarmRules
         self.nextDayOverride = nextDayOverride
         self.holidayEntries = holidayEntries
         self.subscriptions = subscriptions
@@ -30,6 +32,66 @@ public struct VibeAlarmSnapshot: Codable, Equatable, Sendable {
         self.leaveKeywords = leaveKeywords
         self.byokConfig = byokConfig
         self.updatedAt = updatedAt
+    }
+
+    /// The alarm the widget, the notification scheduler and the Siri intents speak about.
+    /// It is the first enabled alarm, so a switched-off first row never silences the rest.
+    public var alarmRule: AlarmRule {
+        get { alarmRules.first(where: \.isEnabled) ?? alarmRules.first ?? AlarmRule() }
+        set {
+            if let index = alarmRules.firstIndex(where: { $0.id == newValue.id }) {
+                alarmRules[index] = newValue
+            } else if alarmRules.isEmpty {
+                alarmRules = [newValue]
+            } else {
+                alarmRules[0] = newValue
+            }
+        }
+    }
+
+    // MARK: - Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case alarmRules
+        case alarmRule
+        case nextDayOverride
+        case holidayEntries
+        case subscriptions
+        case selectedLocalCalendarIDs
+        case leaveKeywords
+        case byokConfig
+        case updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Snapshots written before alarms became a list only carry a single rule.
+        if let rules = try container.decodeIfPresent([AlarmRule].self, forKey: .alarmRules) {
+            alarmRules = rules.isEmpty ? [AlarmRule()] : rules
+        } else if let single = try container.decodeIfPresent(AlarmRule.self, forKey: .alarmRule) {
+            alarmRules = [single]
+        } else {
+            alarmRules = [AlarmRule()]
+        }
+        nextDayOverride = try container.decodeIfPresent(NextDayOverride.self, forKey: .nextDayOverride)
+        holidayEntries = try container.decodeIfPresent([HolidayCalendarEntry].self, forKey: .holidayEntries) ?? BuiltinHolidays.entries2026
+        subscriptions = try container.decodeIfPresent([ExternalCalendarSubscription].self, forKey: .subscriptions) ?? ExternalCalendarSubscription.defaultPresets
+        selectedLocalCalendarIDs = try container.decodeIfPresent([String].self, forKey: .selectedLocalCalendarIDs) ?? []
+        leaveKeywords = try container.decodeIfPresent([String].self, forKey: .leaveKeywords) ?? Self.defaultLeaveKeywords
+        byokConfig = try container.decodeIfPresent(BYOKConfiguration.self, forKey: .byokConfig) ?? BYOKConfiguration()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(alarmRules, forKey: .alarmRules)
+        try container.encodeIfPresent(nextDayOverride, forKey: .nextDayOverride)
+        try container.encode(holidayEntries, forKey: .holidayEntries)
+        try container.encode(subscriptions, forKey: .subscriptions)
+        try container.encode(selectedLocalCalendarIDs, forKey: .selectedLocalCalendarIDs)
+        try container.encode(leaveKeywords, forKey: .leaveKeywords)
+        try container.encode(byokConfig, forKey: .byokConfig)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
 
     public static let defaultLeaveKeywords: [String] = [
@@ -141,9 +203,43 @@ public final class SharedAlarmStore: @unchecked Sendable {
     }
 
     @discardableResult
+    public func updateAlarm(id: UUID, _ transform: (inout AlarmRule) -> Void) throws -> VibeAlarmSnapshot {
+        try mutate { snapshot in
+            if let index = snapshot.alarmRules.firstIndex(where: { $0.id == id }) {
+                transform(&snapshot.alarmRules[index])
+            }
+        }
+    }
+
+    @discardableResult
+    public func setAlarmEnabled(id: UUID, isEnabled: Bool) throws -> VibeAlarmSnapshot {
+        try updateAlarm(id: id) { $0.isEnabled = isEnabled }
+    }
+
+    @discardableResult
+    public func addAlarm(_ alarm: AlarmRule) throws -> VibeAlarmSnapshot {
+        try mutate { snapshot in
+            snapshot.alarmRules.append(alarm)
+        }
+    }
+
+    @discardableResult
+    public func removeAlarm(id: UUID) throws -> VibeAlarmSnapshot {
+        try mutate { snapshot in
+            snapshot.alarmRules.removeAll { $0.id == id }
+            if snapshot.alarmRules.isEmpty {
+                snapshot.alarmRules = [AlarmRule(isEnabled: false)]
+            }
+        }
+    }
+
+    @discardableResult
     public func setSnoozeMinutes(_ minutes: Int) throws -> VibeAlarmSnapshot {
         try mutate { snapshot in
-            snapshot.alarmRule.snoozeMinutes = AlarmRule.normalizedSnoozeMinutes(minutes)
+            let normalized = AlarmRule.normalizedSnoozeMinutes(minutes)
+            for index in snapshot.alarmRules.indices {
+                snapshot.alarmRules[index].snoozeMinutes = normalized
+            }
         }
     }
 

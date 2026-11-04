@@ -80,60 +80,73 @@ public enum AlarmNotificationScheduler {
             center.removePendingNotificationRequests(withIdentifiers: existingIDs)
         }
 
-        guard snapshot.alarmRule.isEnabled else { return }
-
         let calendar = AlarmScheduleEngine.defaultCalendar()
         let engine = AlarmScheduleEngine(calendar: calendar)
+
+        // 1. Schedule wake-up multi-burst notifications for every enabled alarm, for today and tomorrow.
+        for rule in snapshot.alarmRules where rule.isEnabled {
+            let (today, tomorrow) = engine.resolveTwoDayDashboard(
+                rule: rule,
+                entries: snapshot.holidayEntries,
+                override: snapshot.nextDayOverride,
+                referenceDate: referenceDate
+            )
+
+            for resolved in [today, tomorrow] {
+                guard resolved.status.isRinging,
+                      let effHour = resolved.effectiveHour,
+                      let effMin = resolved.effectiveMinute,
+                      let baseDate = engine.date(from: resolved.date) else {
+                    continue
+                }
+
+                var comps = calendar.dateComponents([.year, .month, .day], from: baseDate)
+                comps.hour = effHour
+                comps.minute = effMin
+                comps.second = 0
+
+                guard let fireDate = calendar.date(from: comps), fireDate > referenceDate else {
+                    continue
+                }
+
+                // Three rapid bursts at 0s, +20s and +40s so the alarm is hard to sleep through.
+                for burstIndex in 0..<3 {
+                    guard let burstDate = calendar.date(byAdding: .second, value: burstIndex * 20, to: fireDate) else {
+                        continue
+                    }
+                    let burstComps = calendar.dateComponents(
+                        [.year, .month, .day, .hour, .minute, .second],
+                        from: burstDate
+                    )
+                    let content = UNMutableNotificationContent()
+                    content.title = "\(rule.label) · \(resolved.effectiveTime ?? resolved.baseTime)"
+                    content.subtitle = "\(resolved.displayLabel) (\(resolved.weekdayText)) · \(resolved.reasonBadge)"
+                    content.body = "Long-press to delay by 30 minutes. Tomorrow's schedule restores automatically."
+                    content.sound = .defaultCritical
+                    content.categoryIdentifier = AppConstants.wakeAlarmCategoryIdentifier
+                    content.interruptionLevel = .timeSensitive
+
+                    let trigger = UNCalendarNotificationTrigger(dateMatching: burstComps, repeats: false)
+                    let reqID = "\(notificationPrefix)wake.\(rule.id.uuidString).\(resolved.date).\(burstIndex)"
+                    let req = UNNotificationRequest(identifier: reqID, content: content, trigger: trigger)
+                    try? await center.add(req)
+                }
+            }
+        }
+
+        // 2. Schedule the pre-bedtime reminder previewing tomorrow's alarm status. The reminder
+        // speaks about the alarm that will actually ring first, so it names the primary rule.
+        let primaryRule = snapshot.alarmRule
         let (today, tomorrow) = engine.resolveTwoDayDashboard(
-            rule: snapshot.alarmRule,
+            rule: primaryRule,
             entries: snapshot.holidayEntries,
             override: snapshot.nextDayOverride,
             referenceDate: referenceDate
         )
 
-        // 1. Schedule wake-up multi-burst notifications for Today & Tomorrow if still in the future
-        for resolved in [today, tomorrow] {
-            guard resolved.status.isRinging,
-                  let effHour = resolved.effectiveHour,
-                  let effMin = resolved.effectiveMinute,
-                  let baseDate = engine.date(from: resolved.date) else {
-                continue
-            }
-
-            var comps = calendar.dateComponents([.year, .month, .day], from: baseDate)
-            comps.hour = effHour
-            comps.minute = effMin
-            comps.second = 0
-
-            guard let fireDate = calendar.date(from: comps), fireDate > referenceDate else {
-                continue
-            }
-
-            // Schedule 3 rapid wake-up bursts (0s, +20s, +40s) with Time Sensitive interruption level
-            for burstIndex in 0..<3 {
-                guard let burstDate = calendar.date(byAdding: .second, value: burstIndex * 20, to: fireDate) else {
-                    continue
-                }
-                let burstComps = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: burstDate)
-                let content = UNMutableNotificationContent()
-                content.title = "⏰ \(snapshot.alarmRule.label) · \(resolved.effectiveTime ?? resolved.baseTime)"
-                content.subtitle = "\(resolved.displayLabel) (\(resolved.weekdayText)) · \(resolved.reasonBadge)"
-                content.body = "Long-press this notification to delay by 30 minutes. Tomorrow's schedule restores automatically."
-                content.sound = .defaultCritical
-                content.categoryIdentifier = AppConstants.wakeAlarmCategoryIdentifier
-                content.interruptionLevel = .timeSensitive
-
-                let trigger = UNCalendarNotificationTrigger(dateMatching: burstComps, repeats: false)
-                let reqID = "\(notificationPrefix)wake.\(resolved.date).\(burstIndex)"
-                let req = UNNotificationRequest(identifier: reqID, content: content, trigger: trigger)
-                try? await center.add(req)
-            }
-        }
-
-        // 2. Schedule Pre-Bedtime Reminder Notification previewing tomorrow's alarm status
-        if snapshot.alarmRule.bedtimeReminderEnabled {
-            let bedHour = snapshot.alarmRule.preBedtimeReminderMinutes / 60
-            let bedMin = snapshot.alarmRule.preBedtimeReminderMinutes % 60
+        if primaryRule.bedtimeReminderEnabled {
+            let bedHour = primaryRule.preBedtimeReminderMinutes / 60
+            let bedMin = primaryRule.preBedtimeReminderMinutes % 60
             var bedComps = calendar.dateComponents([.year, .month, .day], from: referenceDate)
             bedComps.hour = bedHour
             bedComps.minute = bedMin
@@ -142,11 +155,11 @@ public enum AlarmNotificationScheduler {
             if let bedDate = calendar.date(from: bedComps), bedDate > referenceDate {
                 let content = UNMutableNotificationContent()
                 if let effTime = tomorrow.effectiveTime, tomorrow.status.isRinging {
-                    content.title = "🌙 Bedtime Check · Tomorrow Rings at \(effTime)"
+                    content.title = "Bedtime Check · Tomorrow Rings at \(effTime)"
                     content.subtitle = "Tomorrow (\(tomorrow.weekdayText)) · \(tomorrow.reasonBadge)"
                     content.body = "Long-press this notification to Skip Tomorrow or Delay +30m/+1h. The day after restores automatically."
                 } else {
-                    content.title = "🌙 Bedtime Check · No Alarm Tomorrow (\(tomorrow.reasonBadge))"
+                    content.title = "Bedtime Check · No Alarm Tomorrow (\(tomorrow.reasonBadge))"
                     content.subtitle = "Tomorrow (\(tomorrow.weekdayText)) was skipped from \(tomorrow.baseTime)"
                     content.body = "Sleep in tomorrow! If you need to wake up anyway, long-press to Keep Tomorrow's Alarm On."
                 }
@@ -182,7 +195,7 @@ public enum AlarmNotificationScheduler {
         let minutes = AlarmRule.normalizedSnoozeMinutes(rule.snoozeMinutes)
         let comps = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
         let content = UNMutableNotificationContent()
-        content.title = "⏰ \(rule.label) · Snoozed \(minutes) min"
+        content.title = "\(rule.label) · Snoozed \(minutes) min"
         content.subtitle = "Snooze alarm"
         content.body = "Long-press this notification to delay by 30 minutes."
         content.sound = .defaultCritical

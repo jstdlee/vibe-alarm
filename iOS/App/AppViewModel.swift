@@ -4,12 +4,29 @@ import UserNotifications
 import VibeAlarmCore
 import WidgetKit
 
+/// One row on the home screen: an alarm rule plus how it resolves today and tomorrow.
+public struct AlarmRow: Identifiable, Equatable {
+    public var rule: AlarmRule
+    public var today: ResolvedDayAlarm
+    public var tomorrow: ResolvedDayAlarm
+
+    public var id: UUID { rule.id }
+
+    public init(rule: AlarmRule, today: ResolvedDayAlarm, tomorrow: ResolvedDayAlarm) {
+        self.rule = rule
+        self.today = today
+        self.tomorrow = tomorrow
+    }
+}
+
 @MainActor
 public final class AppViewModel: ObservableObject {
     @Published public var snapshot: VibeAlarmSnapshot
     @Published public private(set) var todayAlarm: ResolvedDayAlarm
     @Published public private(set) var tomorrowAlarm: ResolvedDayAlarm
     @Published public private(set) var upcomingWeek: [ResolvedDayAlarm] = []
+    /// Every alarm, resolved for today and tomorrow. The home screen renders exactly this.
+    @Published public private(set) var alarmRows: [AlarmRow] = []
     @Published public var statusBannerMessage: String?
     @Published public var isSyncingICS: Bool = false
     @Published public private(set) var lastLocalCalendarScanAt: Date?
@@ -44,6 +61,31 @@ public final class AppViewModel: ObservableObject {
             referenceDate: refDate,
             daysCount: 7
         )
+        self.alarmRows = Self.resolveRows(
+            rules: loaded.alarmRules,
+            entries: loaded.holidayEntries,
+            override: loaded.nextDayOverride,
+            referenceDate: refDate,
+            engine: engine
+        )
+    }
+
+    private static func resolveRows(
+        rules: [AlarmRule],
+        entries: [HolidayCalendarEntry],
+        override: NextDayOverride?,
+        referenceDate: Date,
+        engine: AlarmScheduleEngine
+    ) -> [AlarmRow] {
+        rules.map { rule in
+            let (today, tomorrow) = engine.resolveTwoDayDashboard(
+                rule: rule,
+                entries: entries,
+                override: override,
+                referenceDate: referenceDate
+            )
+            return AlarmRow(rule: rule, today: today, tomorrow: tomorrow)
+        }
     }
 
     /// Creates a pre-seeded demo ViewModel for UI previews and Simulator screenshot capture.
@@ -109,18 +151,34 @@ public final class AppViewModel: ObservableObject {
         }
 
         let demoSnapshot = VibeAlarmSnapshot(
-            alarmRule: AlarmRule(
-                label: "Wake Alarm",
-                hour: 7,
-                minute: 30,
-                isEnabled: true,
-                repeatMode: .weekdays,
-                skipPublicHolidays: true,
-                skipPersonalLeave: true,
-                autoRestoreNextDay: true,
-                preBedtimeReminderMinutes: 22 * 60 + 30,
-                bedtimeReminderEnabled: true
-            ),
+            alarmRules: [
+                AlarmRule(
+                    id: UUID(uuidString: "A1000000-0000-4000-8000-000000000001")!,
+                    label: "Workday",
+                    hour: 7,
+                    minute: 30,
+                    isEnabled: true,
+                    repeatMode: .weekdays,
+                    skipPublicHolidays: true,
+                    skipPersonalLeave: true,
+                    autoRestoreNextDay: true,
+                    preBedtimeReminderMinutes: 22 * 60 + 30,
+                    bedtimeReminderEnabled: true
+                ),
+                AlarmRule(
+                    id: UUID(uuidString: "A1000000-0000-4000-8000-000000000002")!,
+                    label: "Weekend",
+                    hour: 9,
+                    minute: 15,
+                    isEnabled: true,
+                    repeatMode: .weekends,
+                    skipPublicHolidays: true,
+                    skipPersonalLeave: true,
+                    autoRestoreNextDay: true,
+                    preBedtimeReminderMinutes: 22 * 60 + 30,
+                    bedtimeReminderEnabled: false
+                )
+            ],
             nextDayOverride: nil,
             holidayEntries: entries,
             subscriptions: subs,
@@ -164,6 +222,13 @@ public final class AppViewModel: ObservableObject {
             referenceDate: refDate,
             daysCount: 7
         )
+        alarmRows = Self.resolveRows(
+            rules: current.alarmRules,
+            entries: current.holidayEntries,
+            override: current.nextDayOverride,
+            referenceDate: refDate,
+            engine: engine
+        )
 
         WidgetCenter.shared.reloadAllTimelines()
         Task {
@@ -186,6 +251,53 @@ public final class AppViewModel: ObservableObject {
         applySnapshot(copy)
     }
 
+    /// Applies an edit to one alarm in the list.
+    public func updateAlarm(id: UUID, _ transform: (inout AlarmRule) -> Void) {
+        var copy = snapshot
+        guard let index = copy.alarmRules.firstIndex(where: { $0.id == id }) else { return }
+        transform(&copy.alarmRules[index])
+        applySnapshot(copy)
+    }
+
+    public func setAlarmEnabled(id: UUID, isEnabled: Bool) {
+        updateAlarm(id: id) { $0.isEnabled = isEnabled }
+    }
+
+    /// Adds a new alarm seeded from the first one so the user only has to change the time.
+    public func addAlarm() {
+        var copy = snapshot
+        let template = copy.alarmRules.first
+        let next = AlarmRule(
+            label: "Alarm \(copy.alarmRules.count + 1)",
+            hour: template?.hour ?? 7,
+            minute: template?.minute ?? 30,
+            isEnabled: true,
+            repeatMode: .everyday,
+            skipPublicHolidays: template?.skipPublicHolidays ?? true,
+            skipPersonalLeave: template?.skipPersonalLeave ?? true,
+            autoRestoreNextDay: true,
+            preBedtimeReminderMinutes: template?.preBedtimeReminderMinutes ?? 22 * 60 + 30,
+            bedtimeReminderEnabled: false,
+            snoozeMinutes: template?.snoozeMinutes ?? 8
+        )
+        copy.alarmRules.append(next)
+        applySnapshot(copy)
+    }
+
+    public func removeAlarm(id: UUID) {
+        var copy = snapshot
+        copy.alarmRules.removeAll { $0.id == id }
+        if copy.alarmRules.isEmpty {
+            copy.alarmRules = [AlarmRule(isEnabled: false)]
+        }
+        applySnapshot(copy)
+    }
+
+    /// Snooze interval is a device-wide preference: it applies to every alarm at once.
+    public func setSnoozeMinutesForAllAlarms(_ minutes: Int) {
+        setSnoozeMinutes(minutes)
+    }
+
     // MARK: - Snooze Interval
 
     public var snoozeMinutes: Int {
@@ -195,7 +307,9 @@ public final class AppViewModel: ObservableObject {
     public func setSnoozeMinutes(_ minutes: Int) {
         let normalized = AlarmRule.normalizedSnoozeMinutes(minutes)
         var copy = snapshot
-        copy.alarmRule.snoozeMinutes = normalized
+        for index in copy.alarmRules.indices {
+            copy.alarmRules[index].snoozeMinutes = normalized
+        }
         applySnapshot(copy)
         // Action titles are fixed at registration time, so re-register whenever the value changes.
         AlarmNotificationScheduler.registerNotificationCategories(snoozeMinutes: normalized)
