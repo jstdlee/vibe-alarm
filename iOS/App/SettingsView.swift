@@ -327,7 +327,9 @@ public struct SettingsView: View {
                 : "Stored in the iOS Keychain.") {
                 Toggle("", isOn: Binding(
                     get: { showBYOKDetails },
-                    set: { withAnimation(.easeInOut(duration: 0.22)) { showBYOKDetails = $0 } }
+                    set: { isOn in
+                        withAnimation(.easeInOut(duration: 0.22)) { showBYOKDetails = isOn }
+                    }
                 ))
                 .labelsHidden()
                 .tint(VibePalette.amber)
