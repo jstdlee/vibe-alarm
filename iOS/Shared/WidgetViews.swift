@@ -2,10 +2,9 @@ import SwiftUI
 import VibeAlarmCore
 import WidgetKit
 
-/// Pure SwiftUI widget content, shared by the Widget extension and the in-app
-/// widget gallery preview screen so both render identical visuals.
+// MARK: - Shared Copy
 
-func widgetTimeOrStatusText(_ day: ResolvedDayAlarm) -> String {
+func widgetTimeText(_ day: ResolvedDayAlarm) -> String {
     if day.status.isRinging {
         return day.effectiveTime ?? day.baseTime
     }
@@ -15,10 +14,10 @@ func widgetTimeOrStatusText(_ day: ResolvedDayAlarm) -> String {
     return "Off"
 }
 
-func widgetShortReason(_ day: ResolvedDayAlarm) -> String? {
+func widgetStateLine(_ day: ResolvedDayAlarm) -> String {
     switch day.status {
     case .scheduled:
-        return day.matchedEntries.first(where: { $0.kind == .makeupWorkday })?.title
+        return day.matchedEntries.first(where: { $0.kind == .makeupWorkday })?.title ?? "Ringing"
     case .delayed(let minutes):
         return "Delayed \(minutes) min"
     case .skippedByHoliday(let reason):
@@ -26,33 +25,51 @@ func widgetShortReason(_ day: ResolvedDayAlarm) -> String? {
     case .skippedByPersonalLeave(let reason):
         return reason
     case .skippedManually:
-        return "Manually skipped"
+        return "Skipped"
     case .noAlarm:
-        return nil
+        return "No alarm"
     }
 }
 
-// MARK: - Small Widget (Tomorrow Only)
-
-/// Skip and delay only make sense when tomorrow will actually ring and has no override yet.
+/// Actions only make sense while tomorrow will actually ring and has no override yet.
 func widgetCanAdjustTomorrow(_ day: ResolvedDayAlarm) -> Bool {
     day.status.isRinging && !day.hasManualOverride
 }
 
-/// Non-interactive placeholder that matches the bordered button shape, shown when an action does not apply.
-struct WidgetInactivePill: View {
+// MARK: - Machined Key (Widget-safe)
+
+/// A milled key for interactive widgets. WidgetKit renders `Button(intent:)` labels without
+/// custom `ButtonStyle` hit areas, so the volume is drawn as a background of the label itself.
+struct WidgetKeyLabel: View {
     let title: String
+    let active: Bool
 
     var body: some View {
         Text(title)
-            .font(.body)
-            .foregroundStyle(.tertiary)
+            .font(.system(size: 12, weight: .semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .foregroundStyle(active ? VibePalette.amber : VibePalette.inkFaint.opacity(0.7))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 7)
-            .background(Capsule().fill(Color.secondary.opacity(0.12)))
-            .accessibilityLabel("\(title), unavailable")
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(active ? VibePalette.paperRaised : VibePalette.paperDeep.opacity(0.5))
+                    .shadow(
+                        color: VibePalette.shadow.opacity(active ? 0.14 : 0.0),
+                        radius: 2,
+                        x: 0,
+                        y: active ? 1.5 : 0
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(VibePalette.hairline.opacity(active ? 0.7 : 0.35), lineWidth: 0.5)
+            )
     }
 }
+
+// MARK: - Small Widget (Tomorrow)
 
 public struct SmallWidgetContentView: View {
     public let tomorrow: ResolvedDayAlarm
@@ -62,49 +79,45 @@ public struct SmallWidgetContentView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Tomorrow")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("TOMORROW")
+                .vibeCaption(VibePalette.inkFaint)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
 
-            Text(widgetTimeOrStatusText(tomorrow))
-                .font(.system(size: 30, weight: .light))
+            Text(widgetTimeText(tomorrow))
+                .font(.system(size: 34, weight: .light))
                 .monospacedDigit()
-                .foregroundStyle(.primary)
+                .foregroundStyle(tomorrow.status.isRinging ? VibePalette.ink : VibePalette.inkFaint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
 
-            if let reason = widgetShortReason(tomorrow) {
-                Text(reason)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Text(widgetStateLine(tomorrow))
+                .font(.system(size: 10.5))
+                .foregroundStyle(VibePalette.inkSoft)
+                .lineLimit(1)
 
             Spacer(minLength: 6)
 
             if tomorrow.hasManualOverride {
                 Button(intent: RestoreTomorrowIntent()) {
-                    Text("Restore")
-                        .frame(maxWidth: .infinity)
+                    WidgetKeyLabel(title: "Restore", active: true)
                 }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
+                .buttonStyle(.plain)
             } else if widgetCanAdjustTomorrow(tomorrow) {
                 Button(intent: SkipTomorrowIntent()) {
-                    Text("Skip")
-                        .frame(maxWidth: .infinity)
+                    WidgetKeyLabel(title: "Skip", active: true)
                 }
-                .buttonStyle(.bordered)
-                .tint(.vibeAccent)
+                .buttonStyle(.plain)
             } else {
-                WidgetInactivePill(title: "Skip")
+                WidgetKeyLabel(title: "Skip", active: false)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - Medium Widget (Today & Tomorrow + Actions)
+// MARK: - Medium Widget (Today & Tomorrow + Keys)
 
 public struct MediumWidgetContentView: View {
     public let today: ResolvedDayAlarm
@@ -116,60 +129,60 @@ public struct MediumWidgetContentView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 14) {
-                dayColumn(today, label: "Today")
-                dayColumn(tomorrow, label: "Tomorrow")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 18) {
+                dayColumn(today, label: "TODAY")
+                Rectangle()
+                    .fill(VibePalette.hairline)
+                    .frame(width: 0.6)
+                dayColumn(tomorrow, label: "TOMORROW")
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 if widgetCanAdjustTomorrow(tomorrow) {
                     Button(intent: SkipTomorrowIntent()) {
-                        Text("Skip").frame(maxWidth: .infinity)
+                        WidgetKeyLabel(title: "Skip", active: true)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.vibeAccent)
+                    .buttonStyle(.plain)
 
                     Button(intent: DelayTomorrow30Intent()) {
-                        Text("+30 min").frame(maxWidth: .infinity)
+                        WidgetKeyLabel(title: "+30 min", active: true)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.vibeAccent)
+                    .buttonStyle(.plain)
                 } else {
-                    WidgetInactivePill(title: "Skip")
-                    WidgetInactivePill(title: "+30 min")
+                    WidgetKeyLabel(title: "Skip", active: false)
+                    WidgetKeyLabel(title: "+30 min", active: false)
                 }
 
                 if tomorrow.hasManualOverride {
                     Button(intent: RestoreTomorrowIntent()) {
-                        Text("Restore").frame(maxWidth: .infinity)
+                        WidgetKeyLabel(title: "Restore", active: true)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.vibeAccent)
+                    .buttonStyle(.plain)
                 } else {
-                    WidgetInactivePill(title: "Restore")
+                    WidgetKeyLabel(title: "Restore", active: false)
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
     private func dayColumn(_ day: ResolvedDayAlarm, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .vibeCaption(VibePalette.inkFaint)
 
-            Text(widgetTimeOrStatusText(day))
-                .font(.system(size: 26, weight: .light))
+            Text(widgetTimeText(day))
+                .font(.system(size: 28, weight: .light))
                 .monospacedDigit()
-                .foregroundStyle(.primary)
+                .foregroundStyle(day.status.isRinging ? VibePalette.ink : VibePalette.inkFaint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
 
-            if let reason = widgetShortReason(day) {
-                Text(reason)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Text(widgetStateLine(day))
+                .font(.system(size: 10.5))
+                .foregroundStyle(VibePalette.inkSoft)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

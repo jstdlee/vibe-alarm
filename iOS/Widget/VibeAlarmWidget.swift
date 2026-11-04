@@ -66,7 +66,7 @@ struct VibeAlarmWidgetEntryView: View {
             }
         }
         .containerBackground(for: .widget) {
-            Color(.systemBackground)
+            VibePalette.paper
         }
     }
 }
