@@ -1,9 +1,10 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// The wake time editor: a large centered time readout, the two semicircular rotary
-/// dials in the thumb zone, and the horizontal thumbwheel rollers for repeat and
-/// holiday rule. Edits are local until "Save" is tapped; "Cancel" discards them.
+/// The wake time editor: a large centered time readout over a calm, full-bleed background,
+/// the two semicircular rotary dials in the thumb zone, and a stack of compact rotary option
+/// dials for Repeat, Holiday Rule and Snooze. Edits to the alarm rule are local until "Save"
+/// is tapped; "Cancel" discards them. Snooze is a standalone preference and applies immediately.
 public struct TimeEditorView: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
@@ -15,8 +16,9 @@ public struct TimeEditorView: View {
     @State private var customDaysSelection: Set<Weekday>
     @State private var onceDate: Date
 
-    private let repeatOptions = ["Workdays", "Every Day", "Weekends", "Custom", "Once"]
+    private let repeatOptions = ["Weekdays", "Every Day", "Weekends", "Custom", "Once"]
     private let holidayOptions = ["Smart", "Always Ring"]
+    private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
     private let weekOrder: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday]
 
     public init(viewModel: AppViewModel) {
@@ -63,15 +65,15 @@ public struct TimeEditorView: View {
     private var content: some View {
         VStack(spacing: 0) {
             timeReadoutHeader
-                .padding(.top, 8)
+                .padding(.top, 12)
                 .padding(.bottom, 4)
 
             dialsZone
                 .frame(height: 300)
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 16) {
-                    rollersSection
+                VStack(spacing: 20) {
+                    optionDialsSection
 
                     if case .customDays = repeatMode {
                         customWeekdaysRow
@@ -82,18 +84,35 @@ public struct TimeEditorView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
-                .padding(.bottom, 24)
+                .padding(.bottom, 32)
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .background(calmBackground)
+    }
+
+    // MARK: - Calm Background
+
+    /// A soft, full-bleed light background with a very subtle accent wash, in the spirit of
+    /// the native Clock and Weather apps. No images, no heavy gradients.
+    private var calmBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(.systemBackground),
+                Color.vibeAccent.opacity(0.05),
+                Color(.systemBackground)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
     }
 
     // MARK: - Top Readout
 
     private var timeReadoutHeader: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             Text(String(format: "%02d:%02d", hour, minute))
-                .font(.system(size: 60, weight: .light, design: .default))
+                .font(.system(size: 64, weight: .light, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
             Text(repeatSummaryText)
@@ -138,15 +157,12 @@ public struct TimeEditorView: View {
         }
     }
 
-    // MARK: - Rollers
+    // MARK: - Option Dials
 
-    private var rollersSection: some View {
-        VStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("REPEAT")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                ThumbwheelRoller(
+    private var optionDialsSection: some View {
+        VStack(spacing: 18) {
+            dialBlock(title: "REPEAT") {
+                RotaryOptionDial(
                     options: repeatOptions,
                     selectedIndex: repeatIndex,
                     accessibilityLabelText: "Repeat"
@@ -155,11 +171,8 @@ public struct TimeEditorView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("HOLIDAY RULE")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                ThumbwheelRoller(
+            dialBlock(title: "HOLIDAY RULE") {
+                RotaryOptionDial(
                     options: holidayOptions,
                     selectedIndex: holidaySmart ? 0 : 1,
                     accessibilityLabelText: "Holiday Rule"
@@ -167,7 +180,42 @@ public struct TimeEditorView: View {
                     holidaySmart = (idx == 0)
                 }
             }
+
+            dialBlock(title: "SNOOZE") {
+                RotaryOptionDial(
+                    options: snoozeOptions,
+                    selectedIndex: snoozeIndex,
+                    accessibilityLabelText: "Snooze"
+                ) { idx in
+                    selectSnoozeIndex(idx)
+                }
+            }
         }
+    }
+
+    private func dialBlock<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private var snoozeIndex: Int {
+        let current = viewModel.snoozeMinutes
+        if let idx = AlarmRule.snoozeIntervalOptions.firstIndex(of: current) {
+            return idx
+        }
+        return 0
+    }
+
+    private func selectSnoozeIndex(_ idx: Int) {
+        guard AlarmRule.snoozeIntervalOptions.indices.contains(idx) else { return }
+        viewModel.setSnoozeMinutes(AlarmRule.snoozeIntervalOptions[idx])
     }
 
     private var repeatIndex: Int {
