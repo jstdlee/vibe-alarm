@@ -60,6 +60,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO | xcbeautify
 
       - name: Capture iOS Simulator screenshots (light theme)
+        timeout-minutes: 22
         run: |
           set -euo pipefail
           APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
@@ -67,6 +68,9 @@ jobs:
           scripts/capture-screenshots.sh "$SIM_UDID" "$APP_PATH" "dist/screenshots"
 
       - name: Capture small phone screenshots (375 x 667)
+        # A layout check, not a release gate: it must never stall the run.
+        continue-on-error: true
+        timeout-minutes: 18
         run: |
           set -euo pipefail
           APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)

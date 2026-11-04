@@ -16,7 +16,23 @@ SUFFIX="${4:-}"
 mkdir -p "$OUT_DIR"
 
 xcrun simctl boot "$UDID" 2>/dev/null || true
-xcrun simctl bootstatus "$UDID" -b
+# `simctl bootstatus -b` can block forever on a freshly created device, so poll with a hard cap.
+python3 - "$UDID" <<'PY'
+import json, subprocess, sys, time
+
+udid = sys.argv[1]
+deadline = time.time() + 240
+while time.time() < deadline:
+    listed = subprocess.run(["xcrun", "simctl", "list", "devices", "-j"],
+                            capture_output=True, text=True).stdout
+    for devices in json.loads(listed)["devices"].values():
+        for device in devices:
+            if device["udid"] == udid and device["state"] == "Booted":
+                sys.exit(0)
+    time.sleep(5)
+print("simulator did not reach Booted within 4 minutes", file=sys.stderr)
+sys.exit(1)
+PY
 xcrun simctl ui "$UDID" appearance light 2>/dev/null || true
 xcrun simctl status_bar "$UDID" override \
   --time "9:41" \
