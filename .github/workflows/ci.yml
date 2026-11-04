@@ -22,7 +22,7 @@ concurrency:
 jobs:
   ios:
     runs-on: macos-26-intel
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -37,8 +37,10 @@ jobs:
       - name: Install tools
         run: brew install xcodegen xcbeautify
 
-      - name: Pick simulator
-        run: echo "SIM_UDID=$(scripts/pick-simulator.sh)" >> "$GITHUB_ENV"
+      - name: Pick simulators
+        run: |
+          echo "SIM_UDID=$(scripts/pick-simulator.sh)" >> "$GITHUB_ENV"
+          echo "SIM_SMALL=$(scripts/pick-small-simulator.sh)" >> "$GITHUB_ENV"
 
       - name: Unit tests (VibeAlarmCore on iOS Simulator)
         working-directory: VibeAlarmCore
@@ -57,90 +59,26 @@ jobs:
             -destination "id=$SIM_UDID" -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO | xcbeautify
 
-      - name: Capture real iOS Simulator screenshots (Light Theme)
-        id: screenshots
+      - name: Capture iOS Simulator screenshots (light theme)
         run: |
           set -euo pipefail
-          mkdir -p dist/screenshots
-          xcrun simctl boot "$SIM_UDID" || true
-          xcrun simctl bootstatus "$SIM_UDID" -b
-          xcrun simctl ui "$SIM_UDID" appearance light || true
-          xcrun simctl status_bar "$SIM_UDID" override \
-            --time "9:41" \
-            --dataNetwork wifi \
-            --wifiMode active \
-            --wifiBars 3 \
-            --cellularMode active \
-            --cellularBars 4 \
-            --batteryState charged \
-            --batteryLevel 100 || true
-
           APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
-          echo "Installing $APP_PATH on simulator $SIM_UDID"
-          xcrun simctl install "$SIM_UDID" "$APP_PATH"
+          echo "Installing $APP_PATH"
+          scripts/capture-screenshots.sh "$SIM_UDID" "$APP_PATH" "dist/screenshots"
 
-          app_running() {
-            local services
-            services="$(xcrun simctl spawn "$SIM_UDID" launchctl list 2>/dev/null || true)"
-            case "$services" in
-              *"UIKitApplication:com.jstdlee.vibealarm"*) return 0 ;;
-              *) return 1 ;;
-            esac
-          }
+      - name: Capture small phone screenshots (375 x 667)
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
+          echo "Installing $APP_PATH on $SIM_SMALL"
+          scripts/capture-screenshots.sh "$SIM_SMALL" "$APP_PATH" "dist/screenshots-small"
 
-          capture_screen() {
-            local mode="$1"
-            local out="$2"
-            for attempt in 1 2 3 4; do
-              xcrun simctl terminate "$SIM_UDID" com.jstdlee.vibealarm || true
-              sleep 2
-              xcrun simctl launch "$SIM_UDID" com.jstdlee.vibealarm -ui-preview-screen "$mode" || true
-              sleep 8
-              if app_running; then
-                # Let the first frame render; the Intel simulator can show the blank launch screen for several seconds.
-                sleep 10
-                xcrun simctl io "$SIM_UDID" screenshot "dist/screenshots/$out"
-                local size
-                size=$(stat -f%z "dist/screenshots/$out")
-                if ! app_running; then
-                  echo "::warning::VibeAlarm exited while rendering $mode (attempt $attempt)"
-                  mkdir -p dist/crashes
-                  xcrun simctl spawn "$SIM_UDID" log show --last 2m --style compact \
-                    --predicate 'process == "VibeAlarm" OR eventMessage CONTAINS "com.jstdlee.vibealarm"' \
-                    > "dist/crashes/log-$mode-$attempt.txt" 2>&1 || true
-                  tail -n 60 "dist/crashes/log-$mode-$attempt.txt" || true
-                  rm -f "dist/screenshots/$out"
-                  continue
-                fi
-                if [ "$size" -gt 100000 ]; then
-                  echo "Captured $out (attempt $attempt, $size bytes)"
-                  return 0
-                fi
-                echo "::warning::Screenshot for $mode looks blank ($size bytes), retrying (attempt $attempt)"
-                continue
-              fi
-              echo "::warning::VibeAlarm not running for mode $mode (attempt $attempt)"
-            done
-            echo "::error::Could not capture $mode: app is not running (crash?)"
-            CAPTURE_FAILED=1
-          }
-
-          CAPTURE_FAILED=0
-          capture_screen "dashboard" "01-two-day-dashboard.png"
-          capture_screen "dial" "02-dual-thumb-dial.png"
-          capture_screen "calendar" "03-builtin-calendar-events.png"
-          capture_screen "settings" "04-external-and-ios-calendar-settings.png"
-          capture_screen "widget" "05-widgets-and-byok.png"
-          capture_screen "search" "06-holiday-country-search.png"
-          capture_screen "editor" "07-full-wake-time-editor.png"
-          ls -lh dist/screenshots/
+      - name: Collect crash reports
+        if: always()
+        run: |
           mkdir -p dist/crashes
           cp ~/Library/Logs/DiagnosticReports/*VibeAlarm* ~/Library/Logs/DiagnosticReports/JetsamEvent* dist/crashes/ 2>/dev/null || true
-          ls -l dist/crashes/
-          if [ "$CAPTURE_FAILED" != "0" ]; then
-            for f in dist/crashes/*; do [ -f "$f" ] && head -c 6000 "$f"; done
-            exit 1
-          fi
+          ls -l dist/crashes/ || true
 
       - name: Build for device & package unsigned IPA
         run: |
@@ -163,6 +101,9 @@ jobs:
             dist/VibeAlarm.ipa
             dist/VibeAlarm.ipa.sha256
             dist/screenshots/*.png
+            dist/screenshots-small/*.png
+            dist/screenshots/crashes/*
+            dist/screenshots-small/crashes/*
             dist/crashes/*
             build/*.xcresult
           if-no-files-found: error
