@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UserNotifications
 import VibeAlarmCore
 import WidgetKit
@@ -42,67 +43,120 @@ struct VibeAlarmApp: App {
     @ViewBuilder
     private var rootView: some View {
         switch previewScreen {
-        case "dial":
-            TimeEditorView(viewModel: viewModel)
+        case "editor":
+            TimeEditorView(viewModel: viewModel, alarmID: viewModel.alarmRows.first?.id ?? UUID())
         case "calendar":
             MainTabView(viewModel: viewModel, initialTab: .calendar)
-        case "settings":
-            MainTabView(viewModel: viewModel, initialTab: .settings)
-        case "widget":
+        case "sources":
+            MainTabView(viewModel: viewModel, initialTab: .sources)
+        case "widgets":
             WidgetGalleryView(viewModel: viewModel)
         case "byok":
             BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
         case "search":
-            // Preset query surfaces several countries including Singapore, which the demo
-            // view model subscribes to so a checkmark state is visible.
+            // A preset query surfaces several countries, including the one the demo view model
+            // already subscribes to, so the added state is visible.
             HolidayCatalogSearchSheet(viewModel: viewModel, initialQuery: "si")
-        case "editor":
-            TimeEditorView(viewModel: viewModel)
         default:
-            MainTabView(viewModel: viewModel, initialTab: .dashboard)
+            MainTabView(viewModel: viewModel, initialTab: .alarms)
         }
     }
 }
 
-// MARK: - Main Tab Bar Navigation (Light Theme)
+// MARK: - Main Navigation
 
-enum MainAppTab: Hashable {
-    case dashboard
+enum MainAppTab: Hashable, CaseIterable {
+    case alarms
     case calendar
-    case settings
+    case sources
+
+    var title: String {
+        switch self {
+        case .alarms: return "ALARMS"
+        case .calendar: return "CALENDAR"
+        case .sources: return "SOURCES"
+        }
+    }
 }
 
+/// Three paper tabs and an amber index that slides under the active one. The bar is drawn, not a
+/// system material, so it belongs to the same machined surface as everything else.
 struct MainTabView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var selectedTab: MainAppTab
+    @Namespace private var indexNamespace
 
-    init(viewModel: AppViewModel, initialTab: MainAppTab = .dashboard) {
+    init(viewModel: AppViewModel, initialTab: MainAppTab = .alarms) {
         self.viewModel = viewModel
         _selectedTab = State(initialValue: initialTab)
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            TwoDayDashboardView(viewModel: viewModel)
-                .tabItem {
-                    Label("Alarm", systemImage: "alarm")
+        ZStack(alignment: .bottom) {
+            Group {
+                switch selectedTab {
+                case .alarms:
+                    AlarmListView(viewModel: viewModel)
+                case .calendar:
+                    HolidayCalendarView(viewModel: viewModel)
+                case .sources:
+                    SettingsView(viewModel: viewModel)
                 }
-                .tag(MainAppTab.dashboard)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            HolidayCalendarView(viewModel: viewModel)
-                .tabItem {
-                    Label("Calendar", systemImage: "calendar")
-                }
-                .tag(MainAppTab.calendar)
-
-            SettingsView(viewModel: viewModel)
-                .tabItem {
-                    Label("Sources", systemImage: "antenna.radiowaves.left.and.right")
-                }
-                .tag(MainAppTab.settings)
+            tabBar
         }
-        .tint(.vibeAccent)
+        .background(VibePalette.paper.ignoresSafeArea())
         .preferredColorScheme(.light)
+    }
+
+    private var tabBar: some View {
+        VStack(spacing: 0) {
+            Hairline()
+            HStack(spacing: 0) {
+                ForEach(MainAppTab.allCases, id: \.self) { tab in
+                    tabKey(tab)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+        }
+        .background(VibePalette.paper.opacity(0.97))
+    }
+
+    private func tabKey(_ tab: MainAppTab) -> some View {
+        let isSelected = tab == selectedTab
+        return Button {
+            guard !isSelected else { return }
+            UISelectionFeedbackGenerator().selectionChanged()
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+                selectedTab = tab
+            }
+        } label: {
+            VStack(spacing: 7) {
+                Text(tab.title)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                    .tracking(1.9)
+                    .foregroundStyle(isSelected ? VibePalette.ink : VibePalette.inkFaint)
+                Group {
+                    if isSelected {
+                        Capsule()
+                            .fill(VibePalette.amber)
+                            .frame(width: 18, height: 2.4)
+                            .matchedGeometryEffect(id: "tab-index", in: indexNamespace)
+                    } else {
+                        Color.clear.frame(width: 18, height: 2.4)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title.capitalized)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
