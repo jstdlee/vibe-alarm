@@ -52,6 +52,12 @@ struct VibeAlarmApp: App {
             WidgetGalleryView(viewModel: viewModel)
         case "byok":
             BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
+        case "search":
+            // Preset query surfaces several countries including Singapore, which the demo
+            // view model subscribes to so a checkmark state is visible.
+            HolidayCatalogSearchSheet(viewModel: viewModel, initialQuery: "si")
+        case "snooze":
+            TimeEditorView(viewModel: viewModel, optionsOnly: true)
         default:
             MainTabView(viewModel: viewModel, initialTab: .dashboard)
         }

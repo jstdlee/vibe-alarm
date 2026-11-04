@@ -16,13 +16,19 @@ public struct TimeEditorView: View {
     @State private var customDaysSelection: Set<Weekday>
     @State private var onceDate: Date
 
+    /// When true, the hero hour/minute dials are omitted and only the Repeat / Holiday Rule /
+    /// Snooze option dials are shown, so all three fit on a 6.1-inch screen without scrolling.
+    /// Used by the "snooze" UI-preview screenshot mode.
+    private let optionsOnly: Bool
+
     private let repeatOptions = ["Weekdays", "Every Day", "Weekends", "Custom", "Once"]
     private let holidayOptions = ["Smart", "Always Ring"]
     private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
     private let weekOrder: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday]
 
-    public init(viewModel: AppViewModel) {
+    public init(viewModel: AppViewModel, optionsOnly: Bool = false) {
         self.viewModel = viewModel
+        self.optionsOnly = optionsOnly
         let rule = viewModel.snapshot.alarmRule
         _hour = State(initialValue: rule.hour)
         _minute = State(initialValue: rule.minute)
@@ -62,7 +68,18 @@ public struct TimeEditorView: View {
         .tint(.vibeAccent)
     }
 
+    @ViewBuilder
     private var content: some View {
+        if optionsOnly {
+            optionsOnlyContent
+                .background(calmBackground)
+        } else {
+            fullEditorContent
+                .background(calmBackground)
+        }
+    }
+
+    private var fullEditorContent: some View {
         VStack(spacing: 0) {
             timeReadoutHeader
                 .padding(.top, 12)
@@ -87,7 +104,28 @@ public struct TimeEditorView: View {
                 .padding(.bottom, 32)
             }
         }
-        .background(calmBackground)
+    }
+
+    /// Compact layout that shows the three option dials (Repeat, Holiday Rule, Snooze) and the
+    /// time readout, all fully visible without scrolling on a 393 x 852 pt screen.
+    private var optionsOnlyContent: some View {
+        VStack(spacing: 20) {
+            timeReadoutHeader
+                .padding(.top, 8)
+
+            optionDialsSection
+
+            if case .customDays = repeatMode {
+                customWeekdaysRow
+            }
+            if case .specificDates = repeatMode {
+                oncePickerRow
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
     }
 
     // MARK: - Calm Background

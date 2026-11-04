@@ -131,6 +131,8 @@ jobs:
           capture_screen "calendar" "03-builtin-calendar-events.png"
           capture_screen "settings" "04-external-and-ios-calendar-settings.png"
           capture_screen "widget" "05-widgets-and-byok.png"
+          capture_screen "search" "06-holiday-country-search.png"
+          capture_screen "snooze" "07-repeat-holiday-snooze-dials.png"
           ls -lh dist/screenshots/
           mkdir -p dist/crashes
           cp ~/Library/Logs/DiagnosticReports/*VibeAlarm* ~/Library/Logs/DiagnosticReports/JetsamEvent* dist/crashes/ 2>/dev/null || true
