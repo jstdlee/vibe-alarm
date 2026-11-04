@@ -1,9 +1,14 @@
 import SwiftUI
+import UIKit
 import VibeAlarmCore
 
-/// The Calendar tab: a month grid with small colored markers (red = holiday,
-/// blue = makeup workday, green = leave), and a native list of entries for the
-/// selected day (or the whole month when nothing is selected).
+/// The Calendar tab: a machined month plate with engraved day cells, then the entries for the
+/// selected day.
+///
+/// Day markers carry kind through shape rather than colour, because the app has exactly one
+/// accent: a filled amber dot is a public holiday, a hollow ring is a makeup workday, and a short
+/// bar is personal leave. The grid sits on the paper with no card around it, so the month reads as
+/// an instrument face rather than a widget.
 public struct HolidayCalendarView: View {
     @ObservedObject var viewModel: AppViewModel
 
@@ -28,40 +33,22 @@ public struct HolidayCalendarView: View {
 
     public var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    monthGridCard
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    monthPlate
+                        .padding(.top, 22)
+                    legend
+                        .padding(.top, 18)
+                    entriesBlock
+                        .padding(.top, 28)
                 }
-                .listRowInsets(EdgeInsets())
-
-                Section {
-                    ForEach(Array(listedEntries.enumerated()), id: \.offset) { _, entry in
-                        entryRow(entry)
-                    }
-                } header: {
-                    Text(listHeaderTitle)
-                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 130)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .listStyle(.insetGrouped)
-            // Keep the last rows clear of the floating tab bar.
-            .contentMargins(.bottom, 96, for: .scrollContent)
-            .navigationTitle("Calendar")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        editingEntry = nil
-                        showEditorSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("Add Entry")
-                }
-                ToolbarItem(placement: .secondaryAction) {
-                    Button("Import with AI") {
-                        showBYOKSheet = true
-                    }
-                }
-            }
+            .background(VibePalette.paper.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showEditorSheet) {
                 HolidayEntryEditorSheet(
                     viewModel: viewModel,
@@ -73,65 +60,124 @@ public struct HolidayCalendarView: View {
                 BYOKInputSheet(viewModel: viewModel, preloadPreview: true)
             }
         }
-        .tint(.vibeAccent)
+        .tint(VibePalette.amber)
     }
 
-    // MARK: - Month Grid
+    // MARK: - Header
 
-    private var monthGridCard: some View {
-        VStack(spacing: 10) {
+    private var header: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("VIBE ALARM")
+                    .vibeCaption()
+                Text("Calendar")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(VibePalette.ink)
+            }
+
+            Spacer()
+
+            HStack(spacing: 10) {
+                Button {
+                    showBYOKSheet = true
+                } label: {
+                    Text("AI")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.3)
+                        .foregroundStyle(VibePalette.inkSoft)
+                        .frame(width: 46, height: 42)
+                        .machinedPlate(corner: 13)
+                }
+                .buttonStyle(KeyPressStyle())
+                .accessibilityLabel("Add Entry With AI")
+
+                Button {
+                    editingEntry = nil
+                    showEditorSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(VibePalette.inkSoft)
+                        .frame(width: 42, height: 42)
+                        .machinedPlate(corner: 13)
+                }
+                .buttonStyle(KeyPressStyle())
+                .accessibilityLabel("Add Entry")
+            }
+        }
+        .padding(.top, 14)
+    }
+
+    // MARK: - Month Plate
+
+    private var monthPlate: some View {
+        VStack(spacing: 14) {
             monthHeader
             weekdayHeaderRow
             monthGrid
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
 
     private var monthHeader: some View {
         HStack {
-            Button {
+            monthStepKey(systemName: "chevron.left", label: "Previous Month") {
                 shiftMonth(by: -1)
-            } label: {
-                Image(systemName: "chevron.left")
             }
-            .buttonStyle(.plain)
 
             Spacer()
 
-            Text("\(Self.monthFullNames[displayedMonth - 1]) \(String(displayedYear))")
-                .font(.headline)
+            VStack(spacing: 3) {
+                Text(Self.monthFullNames[displayedMonth - 1].uppercased())
+                    .vibeCaption(VibePalette.inkSoft)
+                Text(String(displayedYear))
+                    .font(.system(size: 26, weight: .light))
+                    .monospacedDigit()
+                    .foregroundStyle(VibePalette.ink)
+            }
 
             Spacer()
 
-            Button {
+            monthStepKey(systemName: "chevron.right", label: "Next Month") {
                 shiftMonth(by: 1)
-            } label: {
-                Image(systemName: "chevron.right")
             }
-            .buttonStyle(.plain)
         }
-        .foregroundStyle(.primary)
+    }
+
+    private func monthStepKey(systemName: String, label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            action()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(VibePalette.inkSoft)
+                .frame(width: 38, height: 38)
+                .machinedPlate(corner: 19)
+        }
+        .buttonStyle(KeyPressStyle())
+        .accessibilityLabel(label)
     }
 
     private var weekdayHeaderRow: some View {
         HStack(spacing: 0) {
             ForEach(Array(Self.weekdayHeaders.enumerated()), id: \.offset) { _, label in
                 Text(label)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(VibePalette.inkFaint.opacity(0.85))
                     .frame(maxWidth: .infinity)
             }
         }
+        .padding(.top, 4)
     }
 
-    /// Plain, non-lazy week rows. A LazyVGrid inside a self-sizing List row can
-    /// trigger an endless layout pass, so the grid is built from fixed rows instead.
+    /// Plain, non-lazy week rows. A LazyVGrid inside a self-sizing container can trigger an
+    /// endless layout pass, so the grid is built from fixed rows instead.
     private var monthGrid: some View {
         let weeks = Self.buildMonthWeeks(year: displayedYear, month: displayedMonth)
-        return VStack(spacing: 6) {
+        return VStack(spacing: 2) {
             ForEach(weeks.indices, id: \.self) { weekIndex in
-                HStack(spacing: 2) {
+                HStack(spacing: 0) {
                     ForEach(0..<7, id: \.self) { column in
                         let cell = weeks[weekIndex][column]
                         if let day = cell.day, let dateStr = cell.dateString {
@@ -139,7 +185,7 @@ public struct HolidayCalendarView: View {
                         } else {
                             Color.clear
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 40)
+                                .frame(height: 44)
                         }
                     }
                 }
@@ -153,38 +199,110 @@ public struct HolidayCalendarView: View {
         let isToday = dateStr == viewModel.todayAlarm.date
 
         return Button {
+            UISelectionFeedbackGenerator().selectionChanged()
             selectedDateString = isSelected ? nil : dateStr
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
                 Text("\(day)")
-                    .font(.system(size: 15, weight: isToday ? .semibold : .regular))
+                    .font(.system(size: 15, weight: isSelected ? .medium : .regular))
                     .monospacedDigit()
-                    .foregroundStyle(isSelected ? Color.white : Color.primary)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(isSelected ? Color.vibeAccent : Color.clear))
-                    .overlay(
-                        Circle().strokeBorder(
-                            (isToday && !isSelected) ? Color.vibeAccent : Color.clear,
-                            lineWidth: 1.5
-                        )
-                    )
-
-                HStack(spacing: 3) {
-                    ForEach(kinds, id: \.self) { kind in
-                        Circle().fill(dotColor(kind)).frame(width: 5, height: 5)
+                    .foregroundStyle(isSelected ? VibePalette.ink : VibePalette.ink.opacity(isToday ? 1 : 0.72))
+                    .frame(width: 32, height: 32)
+                    .background {
+                        if isSelected {
+                            Circle().fill(VibePalette.paperDeep.opacity(0.9))
+                            Circle()
+                                .strokeBorder(VibePalette.hairline.opacity(0.9), lineWidth: 0.7)
+                        } else if isToday {
+                            Circle().strokeBorder(VibePalette.amber.opacity(0.85), lineWidth: 1)
+                        }
                     }
-                }
-                .frame(height: 6)
+
+                markerRow(kinds)
+                    .frame(height: 6)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 40)
+            .frame(height: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(day)")
+        .accessibilityLabel(Self.accessibilityLabel(day: day, kinds: kinds))
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
-    // MARK: - Entries List
+    /// Kind read as shape: filled dot for a public holiday, hollow ring for a makeup workday,
+    /// short bar for personal leave.
+    private func markerRow(_ kinds: [HolidayEntryKind]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(kinds, id: \.self) { kind in
+                switch kind {
+                case .publicHoliday:
+                    Circle()
+                        .fill(VibePalette.amber)
+                        .frame(width: 5, height: 5)
+                case .makeupWorkday:
+                    Circle()
+                        .strokeBorder(VibePalette.inkSoft.opacity(0.75), lineWidth: 1)
+                        .frame(width: 5, height: 5)
+                case .personalLeave:
+                    Capsule()
+                        .fill(VibePalette.inkFaint)
+                        .frame(width: 7, height: 1.8)
+                }
+            }
+        }
+    }
+
+    private var legend: some View {
+        HStack(spacing: 16) {
+            legendItem(shape: AnyView(Circle().fill(VibePalette.amber).frame(width: 5, height: 5)), text: "Holiday")
+            legendItem(
+                shape: AnyView(Circle().strokeBorder(VibePalette.inkSoft.opacity(0.75), lineWidth: 1).frame(width: 5, height: 5)),
+                text: "Makeup workday"
+            )
+            legendItem(shape: AnyView(Capsule().fill(VibePalette.inkFaint).frame(width: 7, height: 1.8)), text: "Leave")
+        }
+    }
+
+    private func legendItem(shape: AnyView, text: String) -> some View {
+        HStack(spacing: 6) {
+            shape
+            Text(text)
+                .font(.system(size: 10.5))
+                .foregroundStyle(VibePalette.inkFaint)
+        }
+    }
+
+    // MARK: - Entries
+
+    private var entriesBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(listHeaderTitle.uppercased())
+                    .vibeCaption(VibePalette.inkSoft)
+                Spacer()
+                Text("\(listedEntries.count)")
+                    .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(VibePalette.inkFaint)
+            }
+            .padding(.bottom, 10)
+
+            Hairline()
+
+            if listedEntries.isEmpty {
+                Text("No entries. Holiday feeds fill this in when they sync; you can also add a day by hand.")
+                    .font(.system(size: 12))
+                    .lineSpacing(3)
+                    .foregroundStyle(VibePalette.inkFaint)
+                    .padding(.top, 16)
+            } else {
+                ForEach(Array(listedEntries.enumerated()), id: \.offset) { _, entry in
+                    entryRow(entry)
+                }
+            }
+        }
+    }
 
     private var listedEntries: [HolidayCalendarEntry] {
         if let selectedDateString {
@@ -206,32 +324,39 @@ public struct HolidayCalendarView: View {
     }
 
     private func entryRow(_ entry: HolidayCalendarEntry) -> some View {
-        Button {
-            editingEntry = entry
-            showEditorSheet = true
-        } label: {
-            HStack(spacing: 10) {
-                Circle().fill(dotColor(entry.kind)).frame(width: 8, height: 8)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.title)
-                        .foregroundStyle(.primary)
-                    Text("\(Self.monthDayCaption(entry.date)) · \(entry.kind.displayTitle)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(entry.source.displayName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .buttonStyle(.plain)
-        .swipeActions {
-            Button(role: .destructive) {
-                viewModel.deleteHolidayEntry(entry)
+        VStack(spacing: 0) {
+            Button {
+                editingEntry = entry
+                showEditorSheet = true
             } label: {
-                Label("Delete", systemImage: "trash")
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(entry.title)
+                            .font(.system(size: 15))
+                            .foregroundStyle(VibePalette.ink)
+                            .lineLimit(1)
+                        Text("\(Self.monthDayCaption(entry.date)) · \(entry.kind.displayTitle)")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(VibePalette.inkFaint)
+                    }
+                    Spacer(minLength: 8)
+                    Text(entry.source.displayName)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(VibePalette.inkFaint.opacity(0.9))
+                        .lineLimit(1)
+                }
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button(role: .destructive) {
+                    viewModel.deleteHolidayEntry(entry)
+                } label: {
+                    Label("Delete Entry", systemImage: "trash")
+                }
+            }
+            Hairline()
         }
     }
 
@@ -248,14 +373,6 @@ public struct HolidayCalendarView: View {
         return result
     }
 
-    private func dotColor(_ kind: HolidayEntryKind) -> Color {
-        switch kind {
-        case .publicHoliday: return .red
-        case .makeupWorkday: return .blue
-        case .personalLeave: return .green
-        }
-    }
-
     private func shiftMonth(by delta: Int) {
         var m = displayedMonth + delta
         var y = displayedYear
@@ -266,8 +383,10 @@ public struct HolidayCalendarView: View {
             m = 1
             y += 1
         }
-        displayedMonth = m
-        displayedYear = y
+        withAnimation(.easeOut(duration: 0.16)) {
+            displayedMonth = m
+            displayedYear = y
+        }
     }
 
     private static let weekdayHeaders = ["M", "T", "W", "T", "F", "S", "S"]
@@ -287,6 +406,12 @@ public struct HolidayCalendarView: View {
             return dateString
         }
         return "\(monthAbbreviations[month - 1]) \(day)"
+    }
+
+    private static func accessibilityLabel(day: Int, kinds: [HolidayEntryKind]) -> String {
+        guard !kinds.isEmpty else { return "\(day)" }
+        let names = kinds.map(\.displayTitle).joined(separator: ", ")
+        return "\(day), \(names)"
     }
 
     private struct MonthDayCell {
@@ -355,47 +480,85 @@ public struct HolidayEntryEditorSheet: View {
 
     public var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Title", text: $title)
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
-                    Picker("Kind", selection: $kind) {
-                        Text("Holiday").tag(HolidayEntryKind.publicHoliday)
-                        Text("Workday").tag(HolidayEntryKind.makeupWorkday)
-                        Text("Leave").tag(HolidayEntryKind.personalLeave)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
+                    field("Title") {
+                        TextField("Holiday name", text: $title)
+                            .font(.system(size: 15))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 13)
+                            .recessedWell(corner: 12)
                     }
-                    .pickerStyle(.segmented)
-                    TextField("Note", text: $note, axis: .vertical)
-                }
 
-                if existingEntry != nil {
-                    Section {
-                        Button("Delete Entry", role: .destructive) {
-                            if let existingEntry {
-                                viewModel.deleteHolidayEntry(existingEntry)
-                            }
-                            dismiss()
+                    field("Date") {
+                        DatePicker("", selection: $date, displayedComponents: .date)
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            .tint(VibePalette.amber)
+                    }
+
+                    field("Kind") {
+                        Picker("Kind", selection: $kind) {
+                            Text("Holiday").tag(HolidayEntryKind.publicHoliday)
+                            Text("Workday").tag(HolidayEntryKind.makeupWorkday)
+                            Text("Leave").tag(HolidayEntryKind.personalLeave)
                         }
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .pickerStyle(.segmented)
+                    }
+
+                    field("Note") {
+                        TextField("Optional", text: $note, axis: .vertical)
+                            .font(.system(size: 14))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 13)
+                            .recessedWell(corner: 12)
+                    }
+
+                    if existingEntry != nil {
+                        Button {
+                            if let existingEntry { viewModel.deleteHolidayEntry(existingEntry) }
+                            dismiss()
+                        } label: {
+                            Text("DELETE ENTRY")
+                                .font(.system(size: 11, weight: .semibold))
+                                .tracking(1.4)
+                                .foregroundStyle(VibePalette.inkSoft)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .machinedPlate(corner: 15)
+                        }
+                        .buttonStyle(KeyPressStyle())
+                        .padding(.top, 8)
                     }
                 }
+                .padding(.horizontal, 26)
+                .padding(.top, 20)
+                .padding(.bottom, 40)
             }
+            .background(VibePalette.paper.ignoresSafeArea())
             .navigationTitle(existingEntry == nil ? "New Entry" : "Edit Entry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(VibePalette.inkSoft)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        save()
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Save") { save() }
+                        .fontWeight(.semibold)
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
-        .tint(.vibeAccent)
+        .tint(VibePalette.amber)
+    }
+
+    private func field<Content: View>(_ caption: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(caption.uppercased())
+                .vibeCaption()
+            content()
+        }
     }
 
     private func save() {

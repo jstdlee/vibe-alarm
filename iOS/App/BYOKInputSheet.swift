@@ -1,110 +1,167 @@
 import SwiftUI
 import VibeAlarmCore
 
-/// Paste an HR notice, leave email, or `.ics` link and extract calendar entries
-/// either on-device (offline rules) or via the Keychain-backed BYOK LLM.
+/// Paste an HR notice, a leave email or a link to an `.ics` feed and turn it into calendar entries,
+/// either with the on-device rules or through the user's own key.
+///
+/// The paste area is a recessed well, the ways to read it are two milled keys, and the results are
+/// a plain list of engraved lines. Nothing is boxed.
 public struct BYOKInputSheet: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var inputText: String = "HR Notice: I will take annual leave from November 11 to 12, 2026.\nI will work a makeup shift on Saturday, November 21, 2026."
+    @State private var inputText: String = ""
     @State private var isExtracting: Bool = false
     @State private var errorMessage: String?
     @State private var extractionResult: BYOKExtractionResult?
 
     private let service = BYOKHolidayService()
+    private let sampleNotice = "Annual leave from November 11 to 12, 2026.\nMakeup shift on Saturday, November 21, 2026."
 
     public init(viewModel: AppViewModel, preloadPreview: Bool = false) {
         self.viewModel = viewModel
         if preloadPreview {
-            let sample = "HR Notice: I will take annual leave from November 11 to 12, 2026.\nI will work a makeup shift on Saturday, November 21, 2026."
-            _extractionResult = State(initialValue: BYOKHolidayService().parseLocally(text: sample))
+            _inputText = State(initialValue: sampleNotice)
+            _extractionResult = State(initialValue: BYOKHolidayService().parseLocally(text: sampleNotice))
         }
     }
 
     public var body: some View {
         NavigationStack {
-            Form {
-                Section {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("PASTE")
+                        .vibeCaption()
+                        .padding(.top, 8)
+
                     TextEditor(text: $inputText)
-                        .frame(minHeight: 100)
-                        .font(.subheadline)
-                } header: {
-                    Text("Notice or Leave Email")
-                } footer: {
-                    Text("Paste a holiday notice, leave email, or a link to an .ics subscription.")
-                }
-
-                Section {
-                    Button {
-                        runOfflineParse()
-                    } label: {
-                        Label("Parse On-Device", systemImage: "bolt.fill")
-                    }
-
-                    Button {
-                        Task { await runBYOKLLMParse() }
-                    } label: {
-                        if isExtracting {
-                            HStack {
-                                ProgressView()
-                                Text("Parsing with BYOK AI…")
+                        .font(.system(size: 14))
+                        .foregroundStyle(VibePalette.ink)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 132)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .recessedWell(corner: 14)
+                        .overlay(alignment: .topLeading) {
+                            if inputText.isEmpty {
+                                Text("A holiday notice, a leave email, or a link to an .ics feed.")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(VibePalette.inkFaint)
+                                    .padding(.horizontal, 17)
+                                    .padding(.vertical, 18)
+                                    .allowsHitTesting(false)
                             }
-                        } else {
-                            Label("Parse with BYOK AI", systemImage: "sparkles")
+                        }
+                        .padding(.top, 8)
+
+                    HStack(spacing: 12) {
+                        actionKey(title: "READ ON DEVICE", enabled: !isExtracting) {
+                            errorMessage = nil
+                            extractionResult = service.parseLocally(text: inputText)
+                        }
+                        actionKey(
+                            title: isExtracting ? "READING" : "READ WITH KEY",
+                            enabled: !isExtracting
+                        ) {
+                            Task { await runBYOKLLMParse() }
                         }
                     }
-                    .disabled(isExtracting)
-                }
+                    .padding(.top, 16)
 
-                if let errorMessage {
-                    Section {
+                    if let errorMessage {
                         Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 11.5))
+                            .lineSpacing(2)
+                            .foregroundStyle(VibePalette.inkFaint)
+                            .padding(.top, 12)
+                    }
+
+                    if let result = extractionResult {
+                        results(result)
+                            .padding(.top, 28)
                     }
                 }
-
-                if let result = extractionResult {
-                    resultsSection(result)
-                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
             }
-            .navigationTitle("Parse Holiday Notice")
+            .background(VibePalette.paper.ignoresSafeArea())
+            .navigationTitle("Parse Notice")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(VibePalette.inkSoft)
                 }
             }
         }
-        .tint(.vibeAccent)
+        .tint(VibePalette.amber)
     }
 
-    @ViewBuilder
-    private func resultsSection(_ result: BYOKExtractionResult) -> some View {
-        Section {
+    private func actionKey(title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(1.3)
+                .foregroundStyle(VibePalette.ink.opacity(enabled ? 1 : 0.4))
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .machinedPlate(corner: 15, raised: enabled)
+        }
+        .buttonStyle(KeyPressStyle())
+        .disabled(!enabled)
+    }
+
+    // MARK: - Results
+
+    private func results(_ result: BYOKExtractionResult) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("FOUND")
+                    .vibeCaption(VibePalette.inkSoft)
+                Spacer()
+                Text("\(result.entries.count)")
+                    .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(VibePalette.inkFaint)
+            }
+            .padding(.bottom, 10)
+
+            Hairline()
+
             ForEach(result.entries) { entry in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.title)
-                        Text(entry.date)
-                            .font(.footnote.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                VStack(spacing: 0) {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(entry.title)
+                                .font(.system(size: 15))
+                                .foregroundStyle(VibePalette.ink)
+                            Text(entry.date)
+                                .font(.system(size: 11.5, design: .monospaced))
+                                .foregroundStyle(VibePalette.inkFaint)
+                        }
+                        Spacer(minLength: 8)
+                        Text(entry.kind.displayTitle.uppercased())
+                            .vibeCaption(VibePalette.inkFaint)
                     }
-                    Spacer()
-                    Text(entry.kind.displayTitle)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(.secondary)
+                    .padding(.vertical, 13)
+                    Hairline()
                 }
             }
 
             ForEach(result.discoveredCalendarURLs, id: \.self) { url in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Calendar Subscription Link")
-                    Text(url)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Calendar feed found")
+                            .font(.system(size: 15))
+                            .foregroundStyle(VibePalette.ink)
+                        Text(url)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(VibePalette.inkFaint)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 13)
+                    Hairline()
                 }
             }
 
@@ -112,25 +169,28 @@ public struct BYOKInputSheet: View {
                 viewModel.mergeExtractedEntries(result.entries, discoveredURLs: result.discoveredCalendarURLs)
                 dismiss()
             } label: {
-                Text("Add \(result.entries.count) to Calendar")
+                Text("ADD TO CALENDAR")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(VibePalette.amber)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .machinedPlate(corner: 15)
             }
+            .buttonStyle(KeyPressStyle())
             .disabled(result.entries.isEmpty && result.discoveredCalendarURLs.isEmpty)
-        } header: {
-            Text("Results")
+            .padding(.top, 22)
         }
     }
 
-    private func runOfflineParse() {
-        errorMessage = nil
-        extractionResult = service.parseLocally(text: inputText)
-    }
+    // MARK: - Parsing
 
     private func runBYOKLLMParse() async {
         errorMessage = nil
         let apiKey = KeychainHelper.loadAPIKey()
         if apiKey.isEmpty {
             extractionResult = service.parseLocally(text: inputText)
-            errorMessage = "No API key configured. Parsed with on-device rules instead."
+            errorMessage = "No key configured. Read with the on-device rules instead."
             return
         }
 
@@ -138,12 +198,11 @@ public struct BYOKInputSheet: View {
         defer { isExtracting = false }
 
         do {
-            let res = try await service.extractHolidaysViaLLM(
+            extractionResult = try await service.extractHolidaysViaLLM(
                 userText: inputText,
                 config: viewModel.snapshot.byokConfig,
                 apiKey: apiKey
             )
-            extractionResult = res
         } catch {
             errorMessage = error.localizedDescription
             extractionResult = service.parseLocally(text: inputText)

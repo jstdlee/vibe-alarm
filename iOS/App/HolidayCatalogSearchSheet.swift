@@ -2,10 +2,12 @@ import SwiftUI
 import UIKit
 import VibeAlarmCore
 
-/// A searchable list of built-in public-holiday calendars. The user types a country name or
-/// ISO code and taps a row to subscribe. Rows that are already subscribed show a checkmark
-/// instead of an "Add" affordance. Presented as a large sheet from the Sources tab, and also
-/// rendered directly as the root in the "search" UI-preview mode.
+/// A searchable list of the built-in public holiday calendars.
+///
+/// Type a country name or a two-letter code; the list narrows as you type. A row that is already
+/// subscribed shows its state in ink rather than a button, so the sheet reads as a catalogue
+/// rather than a set of offers. Presented as a large sheet from Sources, and also rendered
+/// directly as the root in the "search" UI-preview mode.
 public struct HolidayCatalogSearchSheet: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
@@ -17,87 +19,136 @@ public struct HolidayCatalogSearchSheet: View {
         _query = State(initialValue: initialQuery)
     }
 
-    /// Catalog matches for the current query (full list sorted by name when empty).
     private var results: [HolidayCatalogItem] {
         HolidayCatalog.search(query)
     }
 
     public var body: some View {
         NavigationStack {
-            List {
-                ForEach(results) { item in
-                    catalogRow(item)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    searchWell
+                        .padding(.top, 6)
+
+                    HStack {
+                        Text(query.isEmpty ? "ALL COUNTRIES" : "RESULTS")
+                            .vibeCaption(VibePalette.inkSoft)
+                        Spacer()
+                        Text("\(results.count)")
+                            .font(.system(size: 11, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(VibePalette.inkFaint)
+                    }
+                    .padding(.top, 26)
+                    .padding(.bottom, 10)
+
+                    Hairline()
+
+                    ForEach(results) { item in
+                        catalogRow(item)
+                    }
                 }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
             }
-            .listStyle(.plain)
+            .background(VibePalette.paper.ignoresSafeArea())
             .navigationTitle("Add Holidays")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "Country or code")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
+                        .foregroundStyle(VibePalette.amber)
                 }
             }
         }
-        .tint(.vibeAccent)
+        .tint(VibePalette.amber)
+    }
+
+    // MARK: - Search
+
+    /// A hand-cut search field: recessed well, no capsule, no magnifier glyph.
+    private var searchWell: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                TextField("Country or code", text: $query)
+                    .font(.system(size: 15))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(VibePalette.ink)
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(VibePalette.inkFaint)
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear Search")
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .recessedWell(corner: 14)
+        }
     }
 
     // MARK: - Row
 
     private func catalogRow(_ item: HolidayCatalogItem) -> some View {
         let subscribed = viewModel.isSubscribed(item)
-        return Button {
-            guard !subscribed else { return }
-            add(item)
-        } label: {
-            HStack(spacing: 12) {
-                isoBadge(item.isoCode)
+        return VStack(spacing: 0) {
+            Button {
+                guard !subscribed else { return }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                viewModel.subscribe(to: item)
+            } label: {
+                HStack(alignment: .center, spacing: 14) {
+                    Text(item.isoCode)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .tracking(1)
+                        .foregroundStyle(VibePalette.inkFaint)
+                        .frame(width: 26, alignment: .leading)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.countryName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                    Text(secondaryLine(for: item))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.countryName)
+                            .font(.system(size: 15, weight: subscribed ? .light : .regular))
+                            .foregroundStyle(subscribed ? VibePalette.inkSoft : VibePalette.ink)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                        Text(secondaryLine(for: item))
+                            .font(.system(size: 11))
+                            .foregroundStyle(VibePalette.inkFaint)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    if subscribed {
+                        Text("ADDED")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .tracking(1.3)
+                            .foregroundStyle(VibePalette.inkFaint)
+                    } else {
+                        Text("ADD")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .tracking(1.3)
+                            .foregroundStyle(VibePalette.amber)
+                    }
                 }
-
-                Spacer(minLength: 8)
-
-                if subscribed {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(Color.vibeAccent)
-                        .accessibilityLabel("Added")
-                } else {
-                    Text("Add")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.vibeAccent)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.vibeAccent.opacity(0.12)))
-                }
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(subscribed)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(item.countryName), \(item.isoCode)")
-        .accessibilityValue(subscribed ? "Added" : "Not added")
-    }
+            .buttonStyle(.plain)
+            .disabled(subscribed)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(item.countryName), \(item.isoCode)")
+            .accessibilityValue(subscribed ? "Added" : "Not added")
 
-    private func isoBadge(_ code: String) -> some View {
-        Text(code)
-            .font(.system(.caption, design: .monospaced).weight(.semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 36, height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(.secondarySystemFill))
-            )
+            Hairline()
+        }
     }
 
     private func secondaryLine(for item: HolidayCatalogItem) -> String {
@@ -105,12 +156,7 @@ public struct HolidayCatalogSearchSheet: View {
         case .chinaStatutory:
             return "Statutory holidays and makeup workdays"
         case .google:
-            return "Google public holidays"
+            return "Public holidays"
         }
-    }
-
-    private func add(_ item: HolidayCatalogItem) {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        viewModel.subscribe(to: item)
     }
 }

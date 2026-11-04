@@ -2,8 +2,12 @@ import SwiftUI
 import UIKit
 import VibeAlarmCore
 
-/// The Sources tab: iOS Calendar access, calendar subscriptions, the on-device
-/// AI parser (BYOK), and a one-line privacy statement. Native `Form` sections only.
+/// The Sources tab: what the alarm listens to, and nothing else.
+///
+/// The page is one column of paper with engraved hairlines between rows. Sections are separated
+/// by space and a short caption, never by a card. Anything that is simply on or off is a Toggle;
+/// the only value that needs choosing with a control other than a switch is the snooze interval,
+/// and it uses the same roller as the wake time editor.
 public struct SettingsView: View {
     @ObservedObject var viewModel: AppViewModel
 
@@ -14,7 +18,8 @@ public struct SettingsView: View {
     @State private var byokStatusMessage: String?
     @State private var showAddCountrySheet = false
     @State private var showAddSubscriptionSheet = false
-    @State private var showSnoozeDial = false
+    @State private var showSnoozeRoller = false
+    @State private var showBYOKDetails = false
 
     private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
 
@@ -24,21 +29,42 @@ public struct SettingsView: View {
 
     public var body: some View {
         NavigationStack {
-            Form {
-                holidayCalendarsSection
-                iOSCalendarSection
-                snoozeSection
-                byokSection
-                privacySection
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("VIBE ALARM")
+                        .vibeCaption()
+                        .padding(.top, 14)
+                    Text("Sources")
+                        .font(.system(size: 34, weight: .light))
+                        .foregroundStyle(VibePalette.ink)
+                        .padding(.top, 6)
+
+                    section("Holiday Calendars", top: 34) {
+                        holidayCalendarRows
+                    }
+
+                    section("iOS Calendar", top: 34) {
+                        iOSCalendarRows
+                    }
+
+                    section("Reminders", top: 34) {
+                        reminderRows
+                    }
+
+                    section("AI Import", top: 34) {
+                        byokRows
+                    }
+
+                    privacyFooter
+                        .padding(.top, 36)
+                }
+                .padding(.horizontal, 26)
+                .padding(.bottom, 120)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .scrollContentBackground(.hidden)
-            .background(calmBackground)
-            // Keep the last rows clear of the floating tab bar.
-            .contentMargins(.bottom, 96, for: .scrollContent)
-            .navigationTitle("Sources")
-            .onAppear {
-                loadInitialState()
-            }
+            .background(VibePalette.paper.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .onAppear { loadInitialState() }
             .sheet(isPresented: $showAddCountrySheet) {
                 HolidayCatalogSearchSheet(viewModel: viewModel)
                     .presentationDetents([.large])
@@ -48,212 +74,239 @@ public struct SettingsView: View {
                 AddSubscriptionSheet(viewModel: viewModel)
             }
         }
-        .tint(.vibeAccent)
+        .tint(VibePalette.amber)
     }
 
-    // MARK: - Calm Background
+    // MARK: - Section Frame
 
-    /// A soft, full-bleed light background with a very subtle accent wash, matching the Wake
-    /// Time editor. No images, no heavy gradients.
-    private var calmBackground: some View {
-        LinearGradient(
-            colors: [
-                Color(.systemGroupedBackground),
-                Color.vibeAccent.opacity(0.04),
-                Color(.systemGroupedBackground)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+    private func section<Content: View>(
+        _ caption: String,
+        top: CGFloat = 28,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(caption.uppercased())
+                .vibeCaption()
+                .padding(.bottom, 10)
+            Hairline()
+            content()
+        }
+        .padding(.top, top)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Row Icon Badge
+    // MARK: - Row Frame
 
-    /// An iOS Settings-style tinted rounded-square glyph used as a row leading accessory.
-    private func iconBadge(_ systemName: String, _ color: Color) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 28, height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous).fill(color)
-            )
-    }
-
-    // MARK: - 2. iOS Calendar
-
-    private var iOSCalendarSection: some View {
-        Section {
-            HStack {
-                Text("Access")
-                Spacer()
-                Text(viewModel.localCalendarManager.accessStatusLabel)
-                    .foregroundStyle(.secondary)
-            }
-
-            if viewModel.localCalendarManager.hasReadAccess {
-                ForEach(viewModel.localCalendarManager.availableCalendars) { cal in
-                    calendarToggleRow(cal)
-                }
-            } else if viewModel.localCalendarManager.authorizationStatus == .denied
-                        || viewModel.localCalendarManager.authorizationStatus == .restricted {
-                Button("Open Settings") {
-                    openSystemSettings()
-                }
-            } else {
-                Button("Grant Access") {
-                    Task { _ = await viewModel.localCalendarManager.requestAccess() }
-                }
-            }
-
-            NavigationLink("Leave Keywords") {
-                LeaveKeywordsEditorView(viewModel: viewModel)
-            }
-
-            Button {
-                Task { await viewModel.syncLocalCalendars() }
-            } label: {
-                HStack {
-                    Text("Scan Now")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    if let lastScan = viewModel.lastLocalCalendarScanAt {
-                        Text(Self.timeFormatter.string(from: lastScan))
-                            .foregroundStyle(.secondary)
+    /// A row on paper: label on the left, optional value on the right, hairline below. Rows carry
+    /// no background of their own, so a section reads as a list of lines rather than a stack of
+    /// cards.
+    private func row<Content: View>(
+        _ title: String,
+        detail: String? = nil,
+        @ViewBuilder accessory: () -> Content
+    ) -> some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(VibePalette.ink)
+                    if let detail {
+                        Text(detail)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(VibePalette.inkFaint)
+                            .lineLimit(2)
                     }
                 }
+                Spacer(minLength: 8)
+                accessory()
             }
-        } header: {
-            Text("iOS Calendar")
-        } footer: {
-            Text("Read-only. Calendar data never leaves this device.")
+            .padding(.vertical, 14)
+            Hairline()
         }
     }
 
-    private func calendarToggleRow(_ cal: LocalCalendarSourceInfo) -> some View {
-        Toggle(isOn: Binding(
-            get: { viewModel.snapshot.selectedLocalCalendarIDs.contains(cal.id) },
-            set: { isOn in
-                var copy = viewModel.snapshot
-                if isOn {
-                    copy.selectedLocalCalendarIDs.append(cal.id)
-                } else {
-                    copy.selectedLocalCalendarIDs.removeAll { $0 == cal.id }
-                }
-                viewModel.applySnapshot(copy)
-            }
-        )) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(Color(hex: cal.colorHex))
-                    .frame(width: 8, height: 8)
-                Text(cal.title)
+    /// A row whose whole surface is a button, used for anything that pushes or opens a sheet.
+    private func linkRow(_ title: String, detail: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            row(title, detail: detail) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(VibePalette.inkFaint.opacity(0.8))
             }
         }
+        .buttonStyle(.plain)
     }
 
-    // MARK: - 1. Holiday Calendars
+    private func valueText(_ text: String, active: Bool = false) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(active ? VibePalette.amber : VibePalette.inkFaint)
+    }
 
-    private var holidayCalendarsSection: some View {
-        Section {
+    // MARK: - Holiday Calendars
+
+    private var holidayCalendarRows: some View {
+        VStack(spacing: 0) {
             ForEach(viewModel.snapshot.subscriptions) { sub in
                 subscriptionRow(sub)
             }
 
-            Button {
+            linkRow(
+                "Add Country",
+                detail: "\(HolidayCatalog.all.count) public holiday feeds, searchable"
+            ) {
                 showAddCountrySheet = true
-            } label: {
-                HStack(spacing: 12) {
-                    iconBadge("globe", .green)
-                    Text("Add Country")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
             }
 
-            Button("Add Custom URL…") {
+            linkRow("Add Custom URL") {
                 showAddSubscriptionSheet = true
             }
 
-            Button {
-                Task { await viewModel.syncExternalSubscriptions() }
-            } label: {
-                Text(viewModel.isSyncingICS ? "Refreshing…" : "Refresh All")
-            }
-            .disabled(viewModel.isSyncingICS)
-        } header: {
-            Text("Holiday Calendars")
-        } footer: {
-            if let latest = viewModel.snapshot.subscriptions.compactMap(\.lastSyncedAt).max() {
-                Text("Last refreshed \(Self.timeFormatter.string(from: latest))")
+            row(
+                "Refresh All",
+                detail: lastRefreshDetail
+            ) {
+                Button {
+                    Task { await viewModel.syncExternalSubscriptions() }
+                } label: {
+                    valueText(viewModel.isSyncingICS ? "Syncing" : "Refresh", active: viewModel.isSyncingICS)
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSyncingICS)
             }
         }
     }
 
     private func subscriptionRow(_ sub: ExternalCalendarSubscription) -> some View {
-        Toggle(isOn: Binding(
-            get: { sub.isEnabled },
-            set: { enabled in viewModel.toggleSubscription(id: sub.id, isEnabled: enabled) }
-        )) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(sub.name)
-                Text(URL(string: sub.url)?.host ?? sub.url)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(sub.name)
+                        .font(.system(size: 15, weight: sub.isEnabled ? .regular : .light))
+                        .foregroundStyle(sub.isEnabled ? VibePalette.ink : VibePalette.inkFaint)
+                        .lineLimit(1)
+                    Text(URL(string: sub.url)?.host ?? sub.url)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(VibePalette.inkFaint)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(
+                    get: { sub.isEnabled },
+                    set: { viewModel.toggleSubscription(id: sub.id, isEnabled: $0) }
+                ))
+                .labelsHidden()
+                .tint(VibePalette.amber)
             }
-        }
-        .swipeActions {
-            Button(role: .destructive) {
-                viewModel.removeSubscription(id: sub.id)
-            } label: {
-                Label("Delete", systemImage: "trash")
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+            .contextMenu {
+                Button(role: .destructive) {
+                    viewModel.removeSubscription(id: sub.id)
+                } label: {
+                    Label("Remove Calendar", systemImage: "trash")
+                }
             }
+            Hairline()
         }
     }
 
-    // MARK: - 3. Snooze
+    private var lastRefreshDetail: String {
+        guard let latest = viewModel.snapshot.subscriptions.compactMap(\.lastSyncedAt).max() else {
+            return "Never synced"
+        }
+        return "Last synced \(Self.timeFormatter.string(from: latest))"
+    }
 
-    private var snoozeSection: some View {
-        Section {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showSnoozeDial.toggle()
+    // MARK: - iOS Calendar
+
+    private var iOSCalendarRows: some View {
+        VStack(spacing: 0) {
+            row("Access", detail: "Read-only. Events never leave this iPhone.") {
+                valueText(viewModel.localCalendarManager.accessStatusLabel)
+            }
+
+            if viewModel.localCalendarManager.hasReadAccess {
+                ForEach(viewModel.localCalendarManager.availableCalendars) { cal in
+                    row(cal.title) {
+                        Toggle("", isOn: Binding(
+                            get: { viewModel.snapshot.selectedLocalCalendarIDs.contains(cal.id) },
+                            set: { isOn in
+                                var copy = viewModel.snapshot
+                                if isOn {
+                                    copy.selectedLocalCalendarIDs.append(cal.id)
+                                } else {
+                                    copy.selectedLocalCalendarIDs.removeAll { $0 == cal.id }
+                                }
+                                viewModel.applySnapshot(copy)
+                            }
+                        ))
+                        .labelsHidden()
+                        .tint(VibePalette.amber)
+                    }
                 }
-            } label: {
-                HStack(spacing: 12) {
-                    iconBadge("zzz", .indigo)
-                    Text("Snooze Interval")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text("\(viewModel.snoozeMinutes) min")
-                        .foregroundStyle(.secondary)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(showSnoozeDial ? 90 : 0))
+            } else if viewModel.localCalendarManager.authorizationStatus == .denied
+                        || viewModel.localCalendarManager.authorizationStatus == .restricted {
+                linkRow("Open iOS Settings") { openSystemSettings() }
+            } else {
+                linkRow("Grant Access") {
+                    Task { _ = await viewModel.localCalendarManager.requestAccess() }
                 }
             }
 
-            if showSnoozeDial {
-                RotaryOptionDial(
+            linkRow(
+                "Leave Keywords",
+                detail: "\(viewModel.snapshot.leaveKeywords.count) keywords mark personal leave"
+            ) {
+                showLeaveKeywords = true
+            }
+
+            row("Scan Now", detail: lastScanDetail) {
+                Button {
+                    Task { await viewModel.syncLocalCalendars() }
+                } label: {
+                    valueText("Scan")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showLeaveKeywords) {
+            NavigationStack { LeaveKeywordsEditorView(viewModel: viewModel) }
+        }
+    }
+
+    @State private var showLeaveKeywords = false
+
+    private var lastScanDetail: String {
+        guard let lastScan = viewModel.lastLocalCalendarScanAt else { return "Not scanned yet" }
+        return "Last scanned \(Self.timeFormatter.string(from: lastScan))"
+    }
+
+    // MARK: - Reminders
+
+    private var reminderRows: some View {
+        VStack(spacing: 0) {
+            row("Snooze Interval", detail: "Used by the notification action and the wake alarm.") {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) { showSnoozeRoller.toggle() }
+                } label: {
+                    valueText("\(viewModel.snoozeMinutes) min", active: showSnoozeRoller)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if showSnoozeRoller {
+                CompactRoller(
+                    caption: "Snooze",
                     options: snoozeOptions,
-                    selectedIndex: snoozeIndex,
-                    accessibilityLabelText: "Snooze Interval"
+                    selectedIndex: snoozeIndex
                 ) { idx in
                     selectSnoozeIndex(idx)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
+                .padding(.vertical, 12)
             }
-        } header: {
-            Text("Snooze")
-        } footer: {
-            Text("Used by the notification snooze action and the wake alarm.")
         }
     }
 
@@ -266,71 +319,125 @@ public struct SettingsView: View {
         viewModel.setSnoozeMinutes(AlarmRule.snoozeIntervalOptions[idx])
     }
 
-    // MARK: - 4. AI Import (BYOK)
+    // MARK: - AI Import
 
-    private var byokSection: some View {
-        Section {
+    private var byokRows: some View {
+        VStack(spacing: 0) {
+            row("Key on Device", detail: KeychainHelper.loadAPIKey().isEmpty
+                ? "No key stored. Paste notices by hand instead."
+                : "Stored in the iOS Keychain.") {
+                Toggle("", isOn: Binding(
+                    get: { showBYOKDetails },
+                    set: { withAnimation(.easeInOut(duration: 0.22)) { showBYOKDetails = $0 } }
+                ))
+                .labelsHidden()
+                .tint(VibePalette.amber)
+            }
+
+            if showBYOKDetails {
+                byokDetails
+            }
+        }
+    }
+
+    private var byokDetails: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Picker("Provider", selection: $provider) {
                 Text("OpenAI Compatible").tag(BYOKProviderKind.openAICompatible)
                 Text("Anthropic").tag(BYOKProviderKind.anthropic)
             }
+            .pickerStyle(.segmented)
             .onChange(of: provider) { _, newValue in
                 endpointURL = newValue.defaultEndpoint
                 modelName = newValue.defaultModel
                 persistBYOKConfig()
             }
 
-            HStack {
-                Text("Base URL")
-                Spacer()
-                TextField("URL", text: $endpointURL)
-                    .multilineTextAlignment(.trailing)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .foregroundStyle(.secondary)
-                    .onSubmit { persistBYOKConfig() }
-            }
+            fieldRow("Base URL", text: $endpointURL, prompt: "https://", isSecure: false)
+            fieldRow("Model", text: $modelName, prompt: "Model", isSecure: false)
+            fieldRow("API Key", text: $apiKeyInput, prompt: "Required", isSecure: true)
 
-            HStack {
-                Text("Model")
-                Spacer()
-                TextField("Model", text: $modelName)
-                    .multilineTextAlignment(.trailing)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .foregroundStyle(.secondary)
-                    .onSubmit { persistBYOKConfig() }
-            }
+            HStack(spacing: 14) {
+                Button {
+                    Task {
+                        saveAPIKey()
+                        byokStatusMessage = await viewModel.testBYOKConnection()
+                    }
+                } label: {
+                    Text("TEST CONNECTION")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(VibePalette.amber)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .machinedPlate(corner: 14)
+                }
+                .buttonStyle(KeyPressStyle())
+                .disabled(viewModel.isTestingBYOKConnection)
 
-            HStack {
-                Text("API Key")
-                Spacer()
-                SecureField("Required", text: $apiKeyInput)
-                    .multilineTextAlignment(.trailing)
-                    .onSubmit { saveAPIKey() }
-            }
-
-            Button("Test Connection") {
-                Task {
+                Button {
                     saveAPIKey()
-                    byokStatusMessage = await viewModel.testBYOKConnection()
+                    byokStatusMessage = "Key saved to the Keychain."
+                } label: {
+                    Text("SAVE KEY")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(VibePalette.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .machinedPlate(corner: 14)
+                }
+                .buttonStyle(KeyPressStyle())
+            }
+
+            if let byokStatusMessage {
+                Text(byokStatusMessage)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(VibePalette.inkFaint)
+                    .lineSpacing(2)
+            }
+        }
+        .padding(.top, 14)
+        .padding(.bottom, 4)
+    }
+
+    private func fieldRow(
+        _ title: String,
+        text: Binding<String>,
+        prompt: String,
+        isSecure: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
+                .vibeCaption()
+            Group {
+                if isSecure {
+                    SecureField(prompt, text: text)
+                } else {
+                    TextField(prompt, text: text)
                 }
             }
-            .disabled(viewModel.isTestingBYOKConnection)
-        } header: {
-            Text("AI Import (BYOK)")
-        } footer: {
-            Text(byokStatusMessage ?? "Stored on this device in the Keychain.")
+            .font(.system(size: 13, design: .monospaced))
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .foregroundStyle(VibePalette.ink)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .recessedWell(corner: 12)
+            .onSubmit { persistBYOKConfig() }
         }
     }
 
-    // MARK: - 5. Privacy
+    // MARK: - Privacy
 
-    private var privacySection: some View {
-        Section {
-            Text("Everything stays on this iPhone. No account, no server.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+    private var privacyFooter: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Hairline()
+                .padding(.bottom, 4)
+            Text("Everything stays on this iPhone. No account, no server, no analytics.")
+                .font(.system(size: 11.5))
+                .lineSpacing(3)
+                .foregroundStyle(VibePalette.inkFaint)
         }
     }
 
@@ -352,6 +459,7 @@ public struct SettingsView: View {
         endpointURL = cfg.endpointURL
         modelName = cfg.model
         apiKeyInput = KeychainHelper.loadAPIKey()
+        showBYOKDetails = !apiKeyInput.isEmpty
         viewModel.localCalendarManager.refreshAuthorizationStatus()
     }
 
@@ -363,44 +471,79 @@ public struct SettingsView: View {
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateStyle = .none
         formatter.timeStyle = .short
         return formatter
     }()
 }
 
-// MARK: - Leave Keywords Editor (Pushed)
+// MARK: - Leave Keywords Editor
 
 public struct LeaveKeywordsEditorView: View {
     @ObservedObject var viewModel: AppViewModel
+    @Environment(\.dismiss) private var dismiss
     @State private var newKeyword: String = ""
 
     public var body: some View {
-        List {
-            Section {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Events in your own calendars whose title or notes contain one of these words are treated as personal leave.")
+                    .font(.system(size: 12))
+                    .lineSpacing(3)
+                    .foregroundStyle(VibePalette.inkFaint)
+                    .padding(.bottom, 18)
+
+                Hairline()
                 ForEach(viewModel.snapshot.leaveKeywords, id: \.self) { keyword in
-                    Text(keyword)
-                }
-                .onDelete { offsets in
-                    for index in offsets {
-                        viewModel.removeLeaveKeyword(viewModel.snapshot.leaveKeywords[index])
+                    VStack(spacing: 0) {
+                        HStack {
+                            Text(keyword)
+                                .font(.system(size: 15))
+                                .foregroundStyle(VibePalette.ink)
+                            Spacer()
+                            Button {
+                                viewModel.removeLeaveKeyword(keyword)
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(VibePalette.inkFaint)
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 12)
+                        Hairline()
                     }
                 }
-            } footer: {
-                Text("Local calendar events whose title or notes contain one of these words are treated as personal leave.")
-            }
 
-            Section {
-                HStack {
+                HStack(spacing: 12) {
                     TextField("New keyword", text: $newKeyword)
-                    Button("Add") {
+                        .font(.system(size: 14))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .recessedWell(corner: 12)
+                    Button {
                         viewModel.addLeaveKeyword(newKeyword)
                         newKeyword = ""
+                    } label: {
+                        Text("ADD")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(1.4)
+                            .foregroundStyle(VibePalette.ink)
+                            .frame(width: 78, height: 42)
+                            .machinedPlate(corner: 12)
                     }
+                    .buttonStyle(KeyPressStyle())
                     .disabled(newKeyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+                .padding(.top, 18)
             }
+            .padding(.horizontal, 26)
+            .padding(.top, 20)
+            .padding(.bottom, 40)
         }
+        .background(VibePalette.paper.ignoresSafeArea())
         .navigationTitle("Leave Keywords")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -418,33 +561,71 @@ public struct AddSubscriptionSheet: View {
 
     public var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name)
-                    TextField("https:// or webcal:// link", text: $urlText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                } footer: {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("Any published .ics feed works, including a shared family calendar.")
+                        .font(.system(size: 12))
+                        .lineSpacing(3)
+                        .foregroundStyle(VibePalette.inkFaint)
+
+                    field("Name", text: $name, prompt: "Calendar name", keyboard: .default)
+                    field("Link", text: $urlText, prompt: "https:// or webcal://", keyboard: .URL)
+
                     if let validationMessage {
                         Text(validationMessage)
+                            .font(.system(size: 11.5))
                             .foregroundStyle(.red)
                     }
+
+                    Button {
+                        addSubscription()
+                    } label: {
+                        Text("ADD CALENDAR")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(1.4)
+                            .foregroundStyle(VibePalette.ink)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .machinedPlate(corner: 16)
+                    }
+                    .buttonStyle(KeyPressStyle())
                 }
+                .padding(.horizontal, 26)
+                .padding(.top, 18)
+                .padding(.bottom, 40)
             }
+            .background(VibePalette.paper.ignoresSafeArea())
             .navigationTitle("Add Subscription")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { addSubscription() }
-                        .fontWeight(.semibold)
+                        .foregroundStyle(VibePalette.inkSoft)
                 }
             }
         }
-        .tint(.vibeAccent)
+        .tint(VibePalette.amber)
+    }
+
+    private func field(
+        _ title: String,
+        text: Binding<String>,
+        prompt: String,
+        keyboard: UIKeyboardType
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
+                .vibeCaption()
+            TextField(prompt, text: text)
+                .font(.system(size: 14))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(keyboard)
+                .foregroundStyle(VibePalette.ink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .recessedWell(corner: 12)
+        }
     }
 
     private func addSubscription() {
@@ -461,20 +642,5 @@ public struct AddSubscriptionSheet: View {
             region: .custom
         )
         dismiss()
-    }
-}
-
-// MARK: - Hex Color Helper
-
-private extension Color {
-    init(hex: String) {
-        var sanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        sanitized.removeAll { $0 == "#" }
-        var value: UInt64 = 0
-        _ = Scanner(string: sanitized).scanHexInt64(&value)
-        let r = Double((value & 0xFF0000) >> 16) / 255.0
-        let g = Double((value & 0x00FF00) >> 8) / 255.0
-        let b = Double(value & 0x0000FF) / 255.0
-        self = Color(red: r, green: g, blue: b)
     }
 }
