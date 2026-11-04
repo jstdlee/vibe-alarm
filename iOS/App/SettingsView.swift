@@ -19,6 +19,7 @@ public struct SettingsView: View {
     @State private var showAddCountrySheet = false
     @State private var showAddSubscriptionSheet = false
     @State private var showSnoozeRoller = false
+    @State private var showLeaveKeywords = false
     @State private var showBYOKDetails = false
 
     private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
@@ -72,6 +73,9 @@ public struct SettingsView: View {
             }
             .sheet(isPresented: $showAddSubscriptionSheet) {
                 AddSubscriptionSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showLeaveKeywords) {
+                NavigationStack { LeaveKeywordsEditorView(viewModel: viewModel) }
             }
         }
         .tint(VibePalette.amber)
@@ -272,12 +276,7 @@ public struct SettingsView: View {
                 .buttonStyle(.plain)
             }
         }
-        .sheet(isPresented: $showLeaveKeywords) {
-            NavigationStack { LeaveKeywordsEditorView(viewModel: viewModel) }
-        }
     }
-
-    @State private var showLeaveKeywords = false
 
     private var lastScanDetail: String {
         guard let lastScan = viewModel.lastLocalCalendarScanAt else { return "Not scanned yet" }

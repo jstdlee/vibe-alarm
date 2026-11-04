@@ -156,7 +156,7 @@ public struct MachinedDisc: View {
                     // ring's rotation cancels it so every numeral stays upright.
                     .rotationEffect(.degrees(-ringRotation))
                     .position(point(rad: (Double(raw) * stepDegrees - 90.0) * .pi / 180.0,
-                                    r: radius * 0.76))
+                                    r: radius * 0.80))
                     .allowsHitTesting(false)
             }
         }
@@ -185,9 +185,9 @@ public struct MachinedDisc: View {
         return ZStack {
             Capsule()
                 .fill(VibePalette.hairline.opacity(0.75))
-                .frame(width: 1.1, height: radius * 0.26)
+                .frame(width: 1.1, height: radius * 0.16)
                 .rotationEffect(.degrees(wellAngleDegrees + 90))
-                .position(point(rad: rad, r: radius * 0.63))
+                .position(point(rad: rad, r: radius * 0.60))
 
             VStack(spacing: 0) {
                 Text(String(format: "%02d", value))
