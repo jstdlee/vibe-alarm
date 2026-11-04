@@ -92,6 +92,21 @@ public final class AppViewModel: ObservableObject {
         for i in subs.indices {
             subs[i].lastSyncedAt = now
         }
+        // The default Singapore preset uses the MOM feed, whose URL differs from the Google
+        // "Singapore" catalog item. Add a subscription matching the catalog item's ICS URL so
+        // the Add Holidays search sheet renders Singapore as already subscribed (checkmark).
+        if let singapore = HolidayCatalog.all.first(where: { $0.isoCode == "SG" && $0.kind == .google }) {
+            subs.append(
+                ExternalCalendarSubscription(
+                    name: singapore.countryName,
+                    url: singapore.icsURL,
+                    regionHint: HolidayCatalog.regionHint(for: singapore),
+                    lastSyncedAt: now,
+                    isEnabled: true,
+                    catalogID: singapore.id
+                )
+            )
+        }
 
         let demoSnapshot = VibeAlarmSnapshot(
             alarmRule: AlarmRule(

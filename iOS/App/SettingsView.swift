@@ -12,7 +12,11 @@ public struct SettingsView: View {
     @State private var modelName: String = ""
     @State private var endpointURL: String = ""
     @State private var byokStatusMessage: String?
+    @State private var showAddCountrySheet = false
     @State private var showAddSubscriptionSheet = false
+    @State private var showSnoozeDial = false
+
+    private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
 
     public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
@@ -21,16 +25,24 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationStack {
             Form {
+                holidayCalendarsSection
                 iOSCalendarSection
-                subscriptionsSection
+                snoozeSection
                 byokSection
                 privacySection
             }
+            .scrollContentBackground(.hidden)
+            .background(calmBackground)
             // Keep the last rows clear of the floating tab bar.
             .contentMargins(.bottom, 96, for: .scrollContent)
             .navigationTitle("Sources")
             .onAppear {
                 loadInitialState()
+            }
+            .sheet(isPresented: $showAddCountrySheet) {
+                HolidayCatalogSearchSheet(viewModel: viewModel)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showAddSubscriptionSheet) {
                 AddSubscriptionSheet(viewModel: viewModel)
@@ -39,7 +51,37 @@ public struct SettingsView: View {
         .tint(.vibeAccent)
     }
 
-    // MARK: - 1. iOS Calendar
+    // MARK: - Calm Background
+
+    /// A soft, full-bleed light background with a very subtle accent wash, matching the Wake
+    /// Time editor. No images, no heavy gradients.
+    private var calmBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(.systemGroupedBackground),
+                Color.vibeAccent.opacity(0.04),
+                Color(.systemGroupedBackground)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Row Icon Badge
+
+    /// An iOS Settings-style tinted rounded-square glyph used as a row leading accessory.
+    private func iconBadge(_ systemName: String, _ color: Color) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 28, height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous).fill(color)
+            )
+    }
+
+    // MARK: - 2. iOS Calendar
 
     private var iOSCalendarSection: some View {
         Section {
@@ -111,15 +153,29 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 2. Subscriptions
+    // MARK: - 1. Holiday Calendars
 
-    private var subscriptionsSection: some View {
+    private var holidayCalendarsSection: some View {
         Section {
             ForEach(viewModel.snapshot.subscriptions) { sub in
                 subscriptionRow(sub)
             }
 
-            Button("Add Subscription…") {
+            Button {
+                showAddCountrySheet = true
+            } label: {
+                HStack(spacing: 12) {
+                    iconBadge("globe", .green)
+                    Text("Add Country")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Button("Add Custom URL…") {
                 showAddSubscriptionSheet = true
             }
 
@@ -130,7 +186,7 @@ public struct SettingsView: View {
             }
             .disabled(viewModel.isSyncingICS)
         } header: {
-            Text("Subscriptions")
+            Text("Holiday Calendars")
         } footer: {
             if let latest = viewModel.snapshot.subscriptions.compactMap(\.lastSyncedAt).max() {
                 Text("Last refreshed \(Self.timeFormatter.string(from: latest))")
@@ -160,7 +216,57 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - 3. AI Assistant (BYOK)
+    // MARK: - 3. Snooze
+
+    private var snoozeSection: some View {
+        Section {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showSnoozeDial.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    iconBadge("zzz", .indigo)
+                    Text("Snooze Interval")
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text("\(viewModel.snoozeMinutes) min")
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(showSnoozeDial ? 90 : 0))
+                }
+            }
+
+            if showSnoozeDial {
+                RotaryOptionDial(
+                    options: snoozeOptions,
+                    selectedIndex: snoozeIndex,
+                    accessibilityLabelText: "Snooze Interval"
+                ) { idx in
+                    selectSnoozeIndex(idx)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("Snooze")
+        } footer: {
+            Text("Used by the notification snooze action and the wake alarm.")
+        }
+    }
+
+    private var snoozeIndex: Int {
+        AlarmRule.snoozeIntervalOptions.firstIndex(of: viewModel.snoozeMinutes) ?? 0
+    }
+
+    private func selectSnoozeIndex(_ idx: Int) {
+        guard AlarmRule.snoozeIntervalOptions.indices.contains(idx) else { return }
+        viewModel.setSnoozeMinutes(AlarmRule.snoozeIntervalOptions[idx])
+    }
+
+    // MARK: - 4. AI Import (BYOK)
 
     private var byokSection: some View {
         Section {
@@ -212,13 +318,13 @@ public struct SettingsView: View {
             }
             .disabled(viewModel.isTestingBYOKConnection)
         } header: {
-            Text("AI Assistant (BYOK)")
+            Text("AI Import (BYOK)")
         } footer: {
             Text(byokStatusMessage ?? "Stored on this device in the Keychain.")
         }
     }
 
-    // MARK: - 4. Privacy
+    // MARK: - 5. Privacy
 
     private var privacySection: some View {
         Section {
