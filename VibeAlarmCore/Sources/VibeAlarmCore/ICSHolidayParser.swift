@@ -42,22 +42,25 @@ public struct ICSHolidayParser: Sendable {
                 if inEvent, let startRaw = dtStartRaw, let title = summary, !title.isEmpty {
                     let cleanTitle = Self.unescapeICSText(title)
                     let cleanDesc = Self.unescapeICSText(description ?? "")
+                    let descWithNewlines = Self.unescapeICSTextPreservingNewlines(description ?? "")
                     let cleanCat = Self.unescapeICSText(categories ?? "")
-                    let kind = Self.classifyEventKind(
-                        summary: cleanTitle,
+                    if let classified = Self.classifyEvent(
+                        title: cleanTitle,
                         description: cleanDesc,
+                        descriptionWithNewlines: descWithNewlines,
                         categories: cleanCat
-                    )
-                    let dates = expandEventDates(dtStartRaw: startRaw, dtEndRaw: dtEndRaw)
-                    for dateStr in dates {
-                        entries.append(
-                            HolidayCalendarEntry(
-                                date: dateStr,
-                                title: cleanTitle,
-                                kind: kind,
-                                source: source
+                    ) {
+                        let dates = expandEventDates(dtStartRaw: startRaw, dtEndRaw: dtEndRaw)
+                        for dateStr in dates {
+                            entries.append(
+                                HolidayCalendarEntry(
+                                    date: dateStr,
+                                    title: classified.title,
+                                    kind: classified.kind,
+                                    source: source
+                                )
                             )
-                        )
+                        }
                     }
                 }
                 inEvent = false
@@ -123,6 +126,122 @@ public struct ICSHolidayParser: Sendable {
         return .publicHoliday
     }
 
+    // MARK: - Per-Event Classification (Google feeds, China statutory feed, keyword fallback)
+
+    /// Resolved classification of a single `VEVENT`: the holiday kind plus the
+    /// display title to store. `classifyEvent` returns `nil` when the event must
+    /// be excluded entirely (e.g. a Google regional holiday or observance).
+    struct ClassifiedHoliday {
+        let kind: HolidayEntryKind
+        let title: String
+    }
+
+    /// Classifies one event using, in priority order: (1) the Google public
+    /// holiday DESCRIPTION rule, (2) the China statutory SUMMARY rule, and
+    /// (3) the existing keyword classification used by the SG/custom feeds.
+    static func classifyEvent(
+        title: String,
+        description: String,
+        descriptionWithNewlines: String,
+        categories: String
+    ) -> ClassifiedHoliday? {
+        // 1. Google public-holiday feeds (English DESCRIPTION).
+        switch classifyGoogleDescription(descriptionWithNewlines) {
+        case .dayOff:
+            return ClassifiedHoliday(kind: .publicHoliday, title: title)
+        case .excluded:
+            return nil
+        case .unrecognized:
+            break
+        }
+
+        // 2. China statutory feed (CJK SUMMARY, expressed only as Unicode scalars).
+        if let china = classifyChineseSummary(title) {
+            return china
+        }
+
+        // 3. Existing keyword classification (SG/custom/built-in feeds).
+        let kind = classifyEventKind(summary: title, description: description, categories: categories)
+        return ClassifiedHoliday(kind: kind, title: title)
+    }
+
+    // MARK: - Google Public Holiday Feed Rule
+
+    /// Classification of a Google holiday feed event derived from its DESCRIPTION
+    /// (after unescaping, with real newlines preserved).
+    enum GoogleHolidayDescription {
+        /// Nationwide day off: DESCRIPTION is exactly "Public holiday" or begins with "Public holiday" + newline.
+        case dayOff
+        /// Regional holiday ("Public holiday in <region>") or an observance: not a nationwide day off.
+        case excluded
+        /// Not a Google-style description; fall back to keyword classification.
+        case unrecognized
+    }
+
+    /// Applies the Google feed rule. Google feeds mix genuine days off with
+    /// regional holidays ("Public holiday in Queensland") and observances
+    /// ("Observance ...") that are NOT days off. Only the former are kept.
+    static func classifyGoogleDescription(_ description: String) -> GoogleHolidayDescription {
+        if description == "Public holiday" || description.hasPrefix("Public holiday\n") {
+            return .dayOff
+        }
+        if description.hasPrefix("Public holiday in ") {
+            return .excluded
+        }
+        if description.hasPrefix("Observance") {
+            return .excluded
+        }
+        return .unrecognized
+    }
+
+    // MARK: - China Statutory Feed Rule (NateScarlet holiday-cn)
+
+    /// Chinese holiday names (expressed as Unicode scalars only, zero literal CJK
+    /// characters in the repository) mapped to English display titles.
+    static let chineseHolidayNames: [(scalars: String, english: String)] = [
+        ("\u{5143}\u{65E6}", "New Year's Day"),
+        ("\u{6625}\u{8282}", "Spring Festival"),
+        ("\u{6E05}\u{660E}\u{8282}", "Qingming Festival"),
+        ("\u{52B3}\u{52A8}\u{8282}", "Labour Day"),
+        ("\u{7AEF}\u{5348}\u{8282}", "Dragon Boat Festival"),
+        ("\u{4E2D}\u{79CB}\u{8282}", "Mid-Autumn Festival"),
+        ("\u{56FD}\u{5E86}\u{8282}", "National Day")
+    ]
+
+    /// Classifies a China statutory feed SUMMARY. The runtime feed serves Chinese
+    /// text; keywords are expressed only as Unicode scalars:
+    /// - U+4E0A U+73ED ("work day") prefix -> makeup workday.
+    /// - U+5047 U+671F ("holiday period") suffix -> public holiday.
+    /// Titles are translated to English for display. Returns `nil` when the
+    /// SUMMARY matches neither rule (so other feeds fall through).
+    static func classifyChineseSummary(_ summary: String) -> ClassifiedHoliday? {
+        let makeupPrefix = "\u{4E0A}\u{73ED}"   // U+4E0A U+73ED, "work day"
+        let holidaySuffix = "\u{5047}\u{671F}"  // U+5047 U+671F, "holiday period"
+
+        if summary.hasPrefix(makeupPrefix) {
+            if let english = chineseHolidayEnglishName(in: summary) {
+                return ClassifiedHoliday(kind: .makeupWorkday, title: "Makeup workday (\(english))")
+            }
+            return ClassifiedHoliday(kind: .makeupWorkday, title: "Makeup workday")
+        }
+
+        if summary.hasSuffix(holidaySuffix) {
+            let english = chineseHolidayEnglishName(in: summary) ?? "China public holiday"
+            return ClassifiedHoliday(kind: .publicHoliday, title: english)
+        }
+
+        return nil
+    }
+
+    /// Returns the English name of the first known Chinese holiday keyword found
+    /// in `summary`, or `nil` if none is present.
+    static func chineseHolidayEnglishName(in summary: String) -> String? {
+        for entry in chineseHolidayNames where summary.contains(entry.scalars) {
+            return entry.english
+        }
+        return nil
+    }
+
     // MARK: - Date Parsing & Multi-Day Expansion
 
     private func expandEventDates(dtStartRaw: String, dtEndRaw: String?) -> [String] {
@@ -180,6 +299,18 @@ public struct ICSHolidayParser: Sendable {
     private static func unescapeICSText(_ text: String) -> String {
         text
             .replacingOccurrences(of: "\\n", with: " ")
+            .replacingOccurrences(of: "\\,", with: ",")
+            .replacingOccurrences(of: "\\;", with: ";")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Like `unescapeICSText` but keeps `\n` / `\N` as real newline characters so
+    /// callers (the Google DESCRIPTION rule) can distinguish "Public holiday\n..."
+    /// (a day off) from "Public holiday in ..." (a regional holiday).
+    private static func unescapeICSTextPreservingNewlines(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\\n", with: "\n")
+            .replacingOccurrences(of: "\\N", with: "\n")
             .replacingOccurrences(of: "\\,", with: ",")
             .replacingOccurrences(of: "\\;", with: ";")
             .trimmingCharacters(in: .whitespacesAndNewlines)

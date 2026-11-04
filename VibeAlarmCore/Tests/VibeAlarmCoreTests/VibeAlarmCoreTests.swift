@@ -183,6 +183,190 @@ final class VibeAlarmCoreTests: XCTestCase {
         XCTAssertEqual(makeups.first?.title, "National Day Makeup Workday")
     }
 
+    func testICSHolidayParserGoogleFeedClassification() {
+        // Full sanitized ASCII sample from google_holidays_sample.ics, embedded line
+        // by line and joined with CRLF to preserve RFC 5545 folding semantics. The
+        // "\\n" / "\\," sequences are literal ICS escapes inside DESCRIPTION values.
+        let icsLines = [
+            "BEGIN:VCALENDAR",
+            "PRODID:-//Google Inc//Google Calendar 70.9054//EN",
+            "VERSION:2.0",
+            "CALSCALE:GREGORIAN",
+            "METHOD:PUBLISH",
+            "X-WR-CALNAME:Holidays in Singapore",
+            "X-WR-TIMEZONE:UTC",
+            "X-WR-CALDESC:Holidays and Observances in Singapore",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20260501",
+            "DTEND;VALUE=DATE:20260502",
+            "DTSTAMP:20261103T232404Z",
+            "UID:20260501_iir73seq4bmhp7ad0dn1kkf7lk@google.com",
+            "CLASS:PUBLIC",
+            "CREATED:20240530T145217Z",
+            "DESCRIPTION:Public holiday",
+            "LAST-MODIFIED:20240530T145217Z",
+            "SEQUENCE:0",
+            "STATUS:CONFIRMED",
+            "SUMMARY:Labour Day",
+            "TRANSP:TRANSPARENT",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20260810",
+            "DTEND;VALUE=DATE:20260811",
+            "DTSTAMP:20261103T232404Z",
+            "UID:20260810_vf99rr6t2mcumr2g358u896rnk@google.com",
+            "CLASS:PUBLIC",
+            "CREATED:20240530T145217Z",
+            "DESCRIPTION:Public holiday",
+            "LAST-MODIFIED:20240530T145217Z",
+            "SEQUENCE:0",
+            "STATUS:CONFIRMED",
+            "SUMMARY:National Day observed",
+            "TRANSP:TRANSPARENT",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20261108",
+            "DTEND;VALUE=DATE:20261109",
+            "DTSTAMP:20261103T232404Z",
+            "UID:20261108_q60kgpfcdpllnrlv5bfdk3lahg@google.com",
+            "CLASS:PUBLIC",
+            "CREATED:20240530T145217Z",
+            "DESCRIPTION:Public holiday",
+            "LAST-MODIFIED:20240530T145217Z",
+            "SEQUENCE:0",
+            "STATUS:CONFIRMED",
+            "SUMMARY:Diwali/Deepavali",
+            "TRANSP:TRANSPARENT",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20260404",
+            "DTEND;VALUE=DATE:20260405",
+            "DTSTAMP:20261103T232404Z",
+            "UID:20260404_7r96it48gek5pljm8789akaiq4@google.com",
+            "CLASS:PUBLIC",
+            "CREATED:20240530T145236Z",
+            "DESCRIPTION:Observance\\nTo hide observances\\, go to Google Calendar Setting",
+            " s > Holidays in Singapore",
+            "LAST-MODIFIED:20240530T145236Z",
+            "SEQUENCE:0",
+            "STATUS:CONFIRMED",
+            "SUMMARY:Easter Saturday",
+            "TRANSP:TRANSPARENT",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20261224",
+            "DTEND;VALUE=DATE:20261225",
+            "DTSTAMP:20261103T232404Z",
+            "UID:20261224_ldgdc27q3t9jlj41f39bo6psbs@google.com",
+            "CLASS:PUBLIC",
+            "CREATED:20240530T145256Z",
+            "DESCRIPTION:Observance\\nTo hide observances\\, go to Google Calendar Setting",
+            " s > Holidays in Singapore",
+            "LAST-MODIFIED:20240530T145256Z",
+            "SEQUENCE:0",
+            "STATUS:CONFIRMED",
+            "SUMMARY:Christmas Eve",
+            "TRANSP:TRANSPARENT",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20260406",
+            "DTEND;VALUE=DATE:20260407",
+            "DTSTAMP:20261103T232406Z",
+            "UID:20260406_gglful72diqo4tgctk1rq4qi1k@google.com",
+            "CLASS:PUBLIC",
+            "CREATED:20241024T090957Z",
+            "DESCRIPTION:Public holiday in Australian Capital Territory\\, New South Wale",
+            " s\\, Northern Territory\\, Queensland\\, South Australia\\, Tasmania\\, Victoria",
+            " \\, Western Australia\\, Cocos and Keeling Islands\\, Heard and McDonald Islan",
+            " ds",
+            "LAST-MODIFIED:20241024T090957Z",
+            "SEQUENCE:0",
+            "STATUS:CONFIRMED",
+            "SUMMARY:Easter Monday (regional holiday)",
+            "TRANSP:TRANSPARENT",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20260101",
+            "DTEND;VALUE=DATE:20260102",
+            "DTSTAMP:20261103T232406Z",
+            "UID:20260101_ohkboet8blbfrvg0kpilr92gf0@google.com",
+            "CLASS:PUBLIC",
+            "CREATED:20240517T092521Z",
+            "DESCRIPTION:Public holiday",
+            "LAST-MODIFIED:20240517T092521Z",
+            "SEQUENCE:0",
+            "STATUS:CONFIRMED",
+            "SUMMARY:New Year's Day",
+            "TRANSP:TRANSPARENT",
+            "END:VEVENT",
+            "END:VCALENDAR"
+        ]
+        let sampleICS = icsLines.joined(separator: "\r\n")
+
+        let parser = ICSHolidayParser(calendar: calendar)
+        let entries = parser.parse(icsContent: sampleICS)
+
+        // Only the four genuine nationwide days off survive; the two observances
+        // and the one regional holiday are excluded.
+        XCTAssertEqual(entries.count, 4)
+        XCTAssertTrue(entries.allSatisfy { $0.kind == .publicHoliday })
+
+        let titlesByDate = Dictionary(uniqueKeysWithValues: entries.map { ($0.date, $0.title) })
+        XCTAssertEqual(titlesByDate["2026-05-01"], "Labour Day")
+        XCTAssertEqual(titlesByDate["2026-08-10"], "National Day observed")
+        XCTAssertEqual(titlesByDate["2026-11-08"], "Diwali/Deepavali")
+        XCTAssertEqual(titlesByDate["2026-01-01"], "New Year's Day")
+
+        // Excluded events must not produce entries.
+        XCTAssertNil(titlesByDate["2026-04-04"]) // Easter Saturday (observance)
+        XCTAssertNil(titlesByDate["2026-12-24"]) // Christmas Eve (observance)
+        XCTAssertNil(titlesByDate["2026-04-06"]) // Easter Monday (regional holiday)
+    }
+
+    func testICSHolidayParserChinaStatutoryFeedMakeupAndTranslation() {
+        // China statutory feed (NateScarlet holiday-cn) serves Chinese SUMMARY text.
+        // The repository stays free of literal CJK characters: every Chinese keyword
+        // is expressed only as Swift Unicode scalar escapes.
+        // Holiday SUMMARY "New Year's Day holiday period": U+5143 U+65E6 U+5047 U+671F.
+        let holidaySummary = "\u{5143}\u{65E6}\u{5047}\u{671F}"
+        // Makeup SUMMARY "work day (makeup New Year's Day holiday period)":
+        // U+4E0A U+73ED U+FF08 U+8865 U+5143 U+65E6 U+5047 U+671F U+FF09.
+        let makeupSummary = "\u{4E0A}\u{73ED}\u{FF08}\u{8865}\u{5143}\u{65E6}\u{5047}\u{671F}\u{FF09}"
+
+        let icsLines = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//NateScarlet/holiday-cn//EN",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20260101",
+            "DTEND;VALUE=DATE:20260104",
+            "SUMMARY:\(holidaySummary)",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "DTSTART;VALUE=DATE:20260104",
+            "DTEND;VALUE=DATE:20260105",
+            "SUMMARY:\(makeupSummary)",
+            "END:VEVENT",
+            "END:VCALENDAR"
+        ]
+        let sampleICS = icsLines.joined(separator: "\r\n")
+
+        let parser = ICSHolidayParser(calendar: calendar)
+        let entries = parser.parse(icsContent: sampleICS)
+
+        // One 3-day holiday (DTEND exclusive) plus one makeup workday.
+        XCTAssertEqual(entries.count, 4)
+
+        let holidays = entries.filter { $0.kind == .publicHoliday }
+        let makeups = entries.filter { $0.kind == .makeupWorkday }
+
+        XCTAssertEqual(holidays.map(\.date), ["2026-01-01", "2026-01-02", "2026-01-03"])
+        XCTAssertTrue(holidays.allSatisfy { $0.title == "New Year's Day" })
+
+        XCTAssertEqual(makeups.map(\.date), ["2026-01-04"])
+        XCTAssertEqual(makeups.first?.title, "Makeup workday (New Year's Day)")
+    }
+
     // MARK: - BYOK Service & Offline Parser Tests
 
     func testBYOKOfflineParserAndCalendarLinkDiscovery() throws {
