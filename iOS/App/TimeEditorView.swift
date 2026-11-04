@@ -3,10 +3,9 @@ import VibeAlarmCore
 
 /// The wake time editor for one alarm.
 ///
-/// One column, top to bottom: the alarm's name, the three option rollers, then the two big discs
+/// One column, top to bottom: the alarm's name, the instrument row (repeat, holiday, snooze), then the two big discs
 /// that fill the lower half of the display where a thumb already rests. Nothing carries a title
-/// above it: a disc prints its unit inside its reading well, and a roller prints its own name at
-/// the bottom middle of its channel. The page is mostly empty paper on purpose, so the two
+/// above it: a disc prints its unit inside its reading well, and each instrument cell prints its own caption. The page is mostly empty paper on purpose, so the two
 /// volumes at the bottom are the only things asking to be touched.
 public struct TimeEditorView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -21,12 +20,14 @@ public struct TimeEditorView: View {
     @State private var customDaysSelection: Set<Weekday>
     @State private var onceDate: Date
 
-    private let repeatOptions = ["Weekdays", "Every Day", "Weekends", "Custom", "Once"]
-    private let holidayOptions = ["Smart Skip", "Always Ring"]
-    private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
-    private let weekOrder: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday, .saturday, .sunday]
+    @State private var activeSheet: WakeOptionSheet?
 
     public init(viewModel: AppViewModel, alarmID: UUID) {
+        self.init(viewModel: viewModel, alarmID: alarmID, initialSheet: nil)
+    }
+
+    init(viewModel: AppViewModel, alarmID: UUID, initialSheet: WakeOptionSheet?) {
+        _activeSheet = State(initialValue: initialSheet)
         self.viewModel = viewModel
         self.alarmID = alarmID
         let rule = viewModel.snapshot.alarmRules.first(where: { $0.id == alarmID })
@@ -65,20 +66,20 @@ public struct TimeEditorView: View {
             VStack(spacing: 0) {
                 titleBlock(isCompact: isCompact)
 
-                rollers(isCompact: isCompact)
-                    .padding(.horizontal, 24)
-                    .padding(.top, isCompact ? 12 : 26)
-
-                if case .customDays = repeatMode {
-                    customWeekdaysRow
-                        .padding(.horizontal, 24)
-                        .padding(.top, 14)
-                }
-
-                if case .specificDates = repeatMode {
-                    oncePickerRow
-                        .padding(.top, 10)
-                }
+                WakeOptionsInstrumentRow(
+                    repeatMode: repeatMode,
+                    onceDate: onceDate,
+                    holidaySmart: holidaySmart,
+                    snoozeMinutes: viewModel.snoozeMinutes,
+                    onOpen: { activeSheet = $0 },
+                    onCycleRepeat: { step in
+                        selectRepeatIndex((repeatIndex + step + 5) % 5)
+                    },
+                    onHolidayChange: { holidaySmart = $0 },
+                    onSnoozeChange: { viewModel.setSnoozeMinutes($0) }
+                )
+                .padding(.horizontal, 24)
+                .padding(.top, isCompact ? 14 : 26)
 
                 Spacer(minLength: 0)
 
@@ -102,6 +103,16 @@ public struct TimeEditorView: View {
         .background(VibePalette.paper.ignoresSafeArea())
         .overlay(alignment: .top) { topBar }
         .statusBarHidden(false)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .repeatDays:
+                RepeatOptionSheet(repeatMode: $repeatMode, customDays: $customDaysSelection, onceDate: $onceDate)
+            case .holiday:
+                HolidayOptionSheet(smart: $holidaySmart)
+            case .snooze:
+                SnoozeOptionSheet(minutes: viewModel.snoozeMinutes) { viewModel.setSnoozeMinutes($0) }
+            }
+        }
     }
 
     // MARK: - Top Bar
@@ -140,52 +151,6 @@ public struct TimeEditorView: View {
         .padding(.top, isCompact ? 40 : 52)
     }
 
-    // MARK: - Rollers
-
-    private func rollers(isCompact: Bool) -> some View {
-        let channel = isCompact ? CGFloat(72) : CGFloat(86)
-        return VStack(spacing: isCompact ? 9 : 14) {
-            CompactRoller(
-                caption: "Repeat",
-                options: repeatOptions,
-                selectedIndex: repeatIndex,
-                spacing: 96,
-                height: channel
-            ) { idx in
-                selectRepeatIndex(idx)
-            }
-
-            CompactRoller(
-                caption: "Holiday Rule",
-                options: holidayOptions,
-                selectedIndex: holidaySmart ? 0 : 1,
-                spacing: 116,
-                height: channel
-            ) { idx in
-                holidaySmart = (idx == 0)
-            }
-
-            CompactRoller(
-                caption: "Snooze",
-                options: snoozeOptions,
-                selectedIndex: snoozeIndex,
-                spacing: 84,
-                height: channel
-            ) { idx in
-                selectSnoozeIndex(idx)
-            }
-        }
-    }
-
-    private var snoozeIndex: Int {
-        AlarmRule.snoozeIntervalOptions.firstIndex(of: viewModel.snoozeMinutes) ?? 0
-    }
-
-    private func selectSnoozeIndex(_ idx: Int) {
-        guard AlarmRule.snoozeIntervalOptions.indices.contains(idx) else { return }
-        viewModel.setSnoozeMinutes(AlarmRule.snoozeIntervalOptions[idx])
-    }
-
     private var repeatIndex: Int {
         switch repeatMode {
         case .weekdays: return 0
@@ -205,63 +170,6 @@ public struct TimeEditorView: View {
         case 4: repeatMode = .specificDates([AlarmScheduleEngine().dateString(from: onceDate)])
         default: break
         }
-    }
-
-    // MARK: - Custom Weekdays
-
-    private var customWeekdaysRow: some View {
-        HStack(spacing: 9) {
-            ForEach(weekOrder, id: \.self) { day in
-                weekdayKey(day)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func weekdayKey(_ day: Weekday) -> some View {
-        let isOn = customDaysSelection.contains(day)
-        return Button {
-            toggleCustomDay(day)
-        } label: {
-            Text(String(day.shortWeekdayName.prefix(1)))
-                .font(.system(size: 14, weight: isOn ? .semibold : .regular))
-                .foregroundStyle(isOn ? VibePalette.amber : VibePalette.inkFaint)
-                .frame(width: 40, height: 40)
-                .machinedPlate(corner: 20, raised: isOn)
-        }
-        .buttonStyle(KeyPressStyle())
-        .accessibilityLabel(day.shortWeekdayName)
-        .accessibilityAddTraits(isOn ? [.isSelected] : [])
-    }
-
-    private func toggleCustomDay(_ day: Weekday) {
-        var next = customDaysSelection
-        if next.contains(day) {
-            next.remove(day)
-        } else {
-            next.insert(day)
-        }
-        customDaysSelection = next
-        repeatMode = .customDays(next)
-    }
-
-    // MARK: - Once Date
-
-    private var oncePickerRow: some View {
-        DatePicker(
-            "Date",
-            selection: Binding(
-                get: { onceDate },
-                set: { newDate in
-                    onceDate = newDate
-                    repeatMode = .specificDates([AlarmScheduleEngine().dateString(from: newDate)])
-                }
-            ),
-            displayedComponents: .date
-        )
-        .datePickerStyle(.compact)
-        .labelsHidden()
-        .tint(VibePalette.amber)
     }
 
     // MARK: - Save

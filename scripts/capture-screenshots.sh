@@ -95,6 +95,7 @@ capture_screen() {
 
 capture_screen "home"     "01-alarms"
 capture_screen "editor"   "02-wake-time-editor"
+capture_screen "editor-repeat" "02b-repeat-sheet"
 capture_screen "calendar" "03-calendar"
 capture_screen "sources"  "04-sources"
 capture_screen "widgets"  "05-widgets"

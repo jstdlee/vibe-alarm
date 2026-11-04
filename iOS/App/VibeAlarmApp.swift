@@ -43,6 +43,8 @@ struct VibeAlarmApp: App {
     @ViewBuilder
     private var rootView: some View {
         switch previewScreen {
+        case "editor-repeat":
+            TimeEditorView(viewModel: viewModel, alarmID: viewModel.alarmRows.first?.id ?? UUID(), initialSheet: .repeatDays)
         case "editor":
             TimeEditorView(viewModel: viewModel, alarmID: viewModel.alarmRows.first?.id ?? UUID())
         case "calendar":

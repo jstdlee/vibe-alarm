@@ -53,7 +53,8 @@ Paste a leave notice or an HR email. The on-device parser (or your own API key, 
 1. **Alarms list with next-day quick keys** — `Skip`, `+10 min` and `Restore` apply to tomorrow only and clear themselves the day after.
 2. **Skeuomorphic controls used sparingly and consistently** (`iOS/Shared`):
    - `MachinedDisc` — the large engraved disc used for the hour and the minute.
-   - `CompactRoller` — a horizontal rotary control whose caption sits at the bottom middle of the control, used for repeat mode, holiday rule and snooze interval.
+   - `WakeOptionsInstrumentRow` — one 64 pt recessed plate split into three instrument cells: Repeat (seven day dots), Holiday (a two-position engraved notch) and Snooze (a quarter-arc gauge you can drag). Tapping a cell opens a medium-height sheet; every cell is a VoiceOver adjustable control.
+   - `CompactRoller` — a horizontal rotary control, now used only for the snooze interval in Settings.
 3. **Three-source holiday engine, all on device**:
    - External `.ics` subscriptions, including China's statutory holidays and makeup workdays, Singapore MOM, and a searchable catalog of 54 national feeds. Google feeds are classified so observances and regional-only days do not silently skip a workday.
    - Read-only `EventKit` scanning of chosen calendars against leave keywords.
