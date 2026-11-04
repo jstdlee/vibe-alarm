@@ -147,14 +147,15 @@ public struct TwoDayDashboardView: View {
                 viewModel.performTomorrowOverride(.skipTomorrow)
             }
             .buttonStyle(.bordered)
-            .tint(isTomorrowSkipped ? Color.vibeAccent : Color.secondary)
             .frame(maxWidth: .infinity)
+            .disabled(!tomorrowWillRing)
 
             Button("+30 min") {
                 viewModel.incrementTomorrowDelay(by: 30)
             }
             .buttonStyle(.bordered)
             .frame(maxWidth: .infinity)
+            .disabled(!tomorrowWillRing)
 
             Button("Restore") {
                 viewModel.performTomorrowOverride(.none)
@@ -170,8 +171,10 @@ public struct TwoDayDashboardView: View {
         .padding(.vertical, 6)
     }
 
-    private var isTomorrowSkipped: Bool {
-        viewModel.tomorrowAlarm.status == .skippedManually
+    /// Mirrors the widgets: Skip and +30 min only apply while tomorrow will actually ring.
+    /// When tomorrow is already Off (holiday, leave, skipped, or no alarm) they are disabled.
+    private var tomorrowWillRing: Bool {
+        viewModel.tomorrowAlarm.status.isRinging
     }
 
     // MARK: - Bedtime Bindings
