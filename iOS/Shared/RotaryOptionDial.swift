@@ -16,6 +16,10 @@ public struct RotaryOptionDial: View {
     public let accessibilityLabelText: String
     public let onSelect: (Int) -> Void
 
+    /// Height of the brushed-metal plate. The arc is deliberately shallow, so the plate only
+    /// needs room for the selected label plus its two neighbours.
+    private let plateHeight: CGFloat
+
     @State private var dragStartAngle: Double?
     @State private var dragStartIndex: Int?
 
@@ -28,11 +32,13 @@ public struct RotaryOptionDial: View {
         options: [String],
         selectedIndex: Int,
         accessibilityLabelText: String,
+        plateHeight: CGFloat = 72,
         onSelect: @escaping (Int) -> Void
     ) {
         self.options = options
         self.selectedIndex = options.isEmpty ? 0 : max(0, min(options.count - 1, selectedIndex))
         self.accessibilityLabelText = accessibilityLabelText
+        self.plateHeight = plateHeight
         self.onSelect = onSelect
     }
 
@@ -50,7 +56,7 @@ public struct RotaryOptionDial: View {
             .contentShape(Rectangle())
             .gesture(dragGesture(center: metrics.center))
         }
-        .frame(height: 120)
+        .frame(height: plateHeight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabelText)
         .accessibilityValue(options.indices.contains(selectedIndex) ? options[selectedIndex] : "")
@@ -93,10 +99,10 @@ public struct RotaryOptionDial: View {
             for k in -8...8 {
                 let angle = -90.0 + Double(k) * (stepAngleDegrees / 2.0)
                 let isMajor = k % 2 == 0
-                let outer = metrics.point(angleDegrees: angle, radius: metrics.tickRadius)
+                let outer = metrics.point(angleDegrees: angle, radius: metrics.tickOuterRadius)
                 let inner = metrics.point(
                     angleDegrees: angle,
-                    radius: metrics.tickRadius + (isMajor ? 14 : 8)
+                    radius: metrics.tickOuterRadius + (isMajor ? 12 : 6)
                 )
                 var tick = Path()
                 tick.move(to: inner)
@@ -114,8 +120,8 @@ public struct RotaryOptionDial: View {
 
     private func indexNotch(metrics: RotaryDialMetrics) -> some View {
         Canvas { context, _ in
-            let top = metrics.point(angleDegrees: -90, radius: metrics.tickRadius + 20)
-            let bottom = metrics.point(angleDegrees: -90, radius: metrics.labelRadius + 16)
+            let top = metrics.point(angleDegrees: -90, radius: metrics.tickOuterRadius + 10)
+            let bottom = metrics.point(angleDegrees: -90, radius: metrics.labelRadius + 14)
             var needle = Path()
             needle.move(to: top)
             needle.addLine(to: bottom)
@@ -144,10 +150,12 @@ public struct RotaryOptionDial: View {
     }
 
     /// Indices rendered around the notch. Clamped to the valid range so the list does not wrap.
+    /// Only the immediate neighbours are drawn: the plate is deliberately shallow, so a
+    /// second neighbour would fall outside it and be clipped mid-glyph.
     private var visibleIndices: [Int] {
         guard !options.isEmpty else { return [] }
-        let lower = max(0, selectedIndex - 3)
-        let upper = min(options.count - 1, selectedIndex + 3)
+        let lower = max(0, selectedIndex - 1)
+        let upper = min(options.count - 1, selectedIndex + 1)
         return Array(lower...upper)
     }
 
@@ -250,19 +258,24 @@ private struct RotaryOptionLabel: View {
 /// Places the dial's circle center well below the frame so the visible arc is a wide, shallow
 /// curve. The large label radius keeps adjacent option labels far enough apart to stay legible
 /// without overlapping on a 393 x 852 pt screen.
+///
+/// The vertical rhythm is fixed in points from the plate's top edge rather than derived from the
+/// radius: engraved ticks occupy `10...22`, the fixed index notch ends at `26`, the selected
+/// label is centred on `36`, and one neighbour step drops to `54`, so a `72` point plate holds
+/// every row with even padding and no dead space at the bottom.
 private struct RotaryDialMetrics {
     let center: CGPoint
     let labelRadius: CGFloat
-    let tickRadius: CGFloat
+    /// Radius at which the tick marks begin (closest to the plate's top edge).
+    let tickOuterRadius: CGFloat
 
     init(size: CGSize) {
         let width = max(size.width, 1)
         let labelRadius = max(180, width * 0.62)
         self.labelRadius = labelRadius
-        // The top (selected) label sits `topInset` from the top edge; everything else follows.
         let topInset: CGFloat = 36
         self.center = CGPoint(x: width / 2, y: topInset + labelRadius)
-        self.tickRadius = labelRadius + 22
+        self.tickOuterRadius = labelRadius + 14
     }
 
     func point(angleDegrees: Double, radius: CGFloat) -> CGPoint {

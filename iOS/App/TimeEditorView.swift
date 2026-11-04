@@ -82,11 +82,11 @@ public struct TimeEditorView: View {
     private var fullEditorContent: some View {
         VStack(spacing: 0) {
             timeReadoutHeader
-                .padding(.top, 12)
-                .padding(.bottom, 4)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
 
             dialsZone
-                .frame(height: 300)
+                .frame(height: 240)
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
@@ -100,8 +100,8 @@ public struct TimeEditorView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 32)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
         }
     }
@@ -150,7 +150,7 @@ public struct TimeEditorView: View {
     private var timeReadoutHeader: some View {
         VStack(spacing: 6) {
             Text(String(format: "%02d:%02d", hour, minute))
-                .font(.system(size: 64, weight: .light, design: .rounded))
+                .font(.system(size: 56, weight: .light, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
             Text(repeatSummaryText)
@@ -198,7 +198,7 @@ public struct TimeEditorView: View {
     // MARK: - Option Dials
 
     private var optionDialsSection: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 12) {
             dialBlock(title: "REPEAT") {
                 RotaryOptionDial(
                     options: repeatOptions,
@@ -235,7 +235,7 @@ public struct TimeEditorView: View {
         title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
