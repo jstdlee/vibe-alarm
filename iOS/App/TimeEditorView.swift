@@ -3,7 +3,7 @@ import VibeAlarmCore
 
 /// The wake time editor: a large centered time readout over a calm, full-bleed background,
 /// a stack of compact rotary option dials, and the two semicircular hour/minute dials
-/// pinned in the lower thumb zone. Option dials cover for Repeat, Holiday Rule and Snooze. Edits to the alarm rule are local until "Save"
+/// pinned in the lower thumb zone. The option dials cover Repeat, Holiday Rule and Snooze. Edits to the alarm rule are local until "Save"
 /// is tapped; "Cancel" discards them. Snooze is a standalone preference and applies immediately.
 public struct TimeEditorView: View {
     @ObservedObject var viewModel: AppViewModel
