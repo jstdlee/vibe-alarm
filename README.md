@@ -12,7 +12,7 @@
 
 ## iOS Simulator Screenshots
 
-Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`, in light appearance. The same seven screens are also captured on a 375 x 667 phone (`docs/screenshots/small/`).
+Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`, in light appearance. Every screen is also captured on a 375 x 667 phone (`docs/screenshots/small/`).
 
 <p align="center">
   <img src="docs/screenshots/01-alarms.png" width="19%" alt="Alarms">
@@ -30,7 +30,7 @@ Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`
 | 1. Alarms | 2. Wake Time |
 | :---: | :---: |
 | <img src="docs/screenshots/01-alarms.png" width="88%" alt="Alarms list"> | <img src="docs/screenshots/02-wake-time-editor.png" width="88%" alt="Wake time editor"> |
-| The home screen is an alarms list. Above it sit three machined quick keys — `Skip`, `+10 min`, `Restore` — that act on tomorrow only. Each row shows the alarm's large time, its repeat summary, today and tomorrow's effective state, and a real toggle. | Two large engraved discs fill the lower half for the hour and the minute, sized for a thumb on each edge. Repeat, Holiday Rule and Snooze are horizontal rotary controls with the caption set into the bottom middle of the control itself, not a title row above it. |
+| The home screen is an alarms list. Above it sit three machined quick keys — `Skip`, `+10 min`, `Restore` — that act on tomorrow only. Each row shows the alarm's large time, its repeat summary, today and tomorrow's effective state, and a real toggle. | Two large engraved discs fill the lower half for the hour and the minute, sized for a thumb on each edge. Repeat, Holiday Rule and Snooze sit in a single 64 pt instrument plate: seven day dots for repeat, an engraved two-position notch for the holiday rule, and a quarter-arc gauge you can drag for snooze. Tapping a cell opens its own sheet. No title rows, no dropdowns. |
 
 | 3. Calendar | 4. Sources |
 | :---: | :---: |
@@ -42,9 +42,10 @@ Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`
 | <img src="docs/screenshots/05-widgets.png" width="88%" alt="Widgets"> | <img src="docs/screenshots/06-holiday-catalog.png" width="88%" alt="Add Holidays"> |
 | Small and medium Home Screen widgets built from the same shared views, with interactive `Skip`, `+10 min` and `Restore` buttons. A bedtime notification previews tomorrow with the same one-tap actions. | A catalog of 54 national public holiday feeds. Search by country name or code and tap `Add`; the feed becomes an ordinary `.ics` subscription. |
 
-<img src="docs/screenshots/07-parse-notice.png" width="40%" alt="Parse Notice">
-
-Paste a leave notice or an HR email. The on-device parser (or your own API key, if you set one) turns it into dated entries — personal leave, public holiday, makeup workday — before anything is saved.
+| 7. Parse Notice | 2b. Repeat Sheet |
+| :---: | :---: |
+| <img src="docs/screenshots/07-parse-notice.png" width="88%" alt="Parse Notice"> | <img src="docs/screenshots/02b-repeat-sheet.png" width="88%" alt="Repeat sheet"> |
+| Paste a leave notice or an HR email. The on-device parser (or your own API key, if you set one) turns it into dated entries — personal leave, public holiday, makeup workday — before anything is saved. | The repeat sheet: four presets on top and every weekday below with checkmarks, so a custom pattern is one or two taps. |
 
 ---
 
