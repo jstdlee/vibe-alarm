@@ -30,7 +30,7 @@ public struct BYOKInputSheet: View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("PASTE")
+                    Text("Paste")
                         .vibeCaption()
                         .padding(.top, 8)
 
@@ -55,12 +55,12 @@ public struct BYOKInputSheet: View {
                         .padding(.top, 8)
 
                     HStack(spacing: 12) {
-                        actionKey(title: "READ ON DEVICE", enabled: !isExtracting) {
+                        actionKey(title: "Read on Device", enabled: !isExtracting) {
                             errorMessage = nil
                             extractionResult = service.parseLocally(text: inputText)
                         }
                         actionKey(
-                            title: isExtracting ? "READING" : "READ WITH KEY",
+                            title: isExtracting ? "Reading" : "Read with Key",
                             enabled: !isExtracting
                         ) {
                             Task { await runBYOKLLMParse() }
@@ -70,7 +70,7 @@ public struct BYOKInputSheet: View {
 
                     if let errorMessage {
                         Text(errorMessage)
-                            .font(.system(size: 11.5))
+                            .font(.footnote)
                             .lineSpacing(2)
                             .foregroundStyle(VibePalette.inkFaint)
                             .padding(.top, 12)
@@ -100,8 +100,7 @@ public struct BYOKInputSheet: View {
     private func actionKey(title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(1.3)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(VibePalette.ink.opacity(enabled ? 1 : 0.4))
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
@@ -116,11 +115,11 @@ public struct BYOKInputSheet: View {
     private func results(_ result: BYOKExtractionResult) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("FOUND")
+                Text("Found")
                     .vibeCaption(VibePalette.inkSoft)
                 Spacer()
                 Text("\(result.entries.count)")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.footnote.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(VibePalette.inkFaint)
             }
@@ -136,11 +135,11 @@ public struct BYOKInputSheet: View {
                                 .font(.system(size: 15))
                                 .foregroundStyle(VibePalette.ink)
                             Text(entry.date)
-                                .font(.system(size: 11.5, design: .monospaced))
+                                .font(.footnote.monospaced())
                                 .foregroundStyle(VibePalette.inkFaint)
                         }
                         Spacer(minLength: 8)
-                        Text(entry.kind.displayTitle.uppercased())
+                        Text(entry.kind.displayTitle)
                             .vibeCaption(VibePalette.inkFaint)
                     }
                     .padding(.vertical, 13)
@@ -155,7 +154,7 @@ public struct BYOKInputSheet: View {
                             .font(.system(size: 15))
                             .foregroundStyle(VibePalette.ink)
                         Text(url)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.footnote.monospaced())
                             .foregroundStyle(VibePalette.inkFaint)
                             .lineLimit(1)
                     }
@@ -169,9 +168,8 @@ public struct BYOKInputSheet: View {
                 viewModel.mergeExtractedEntries(result.entries, discoveredURLs: result.discoveredCalendarURLs)
                 dismiss()
             } label: {
-                Text("ADD TO CALENDAR")
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .tracking(1.4)
+                Text("Add to Calendar")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(VibePalette.amber)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)

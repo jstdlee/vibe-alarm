@@ -25,7 +25,6 @@ struct VibeAlarmApp: App {
     var body: some Scene {
         WindowGroup {
             rootView
-                .preferredColorScheme(.light)
                 .task {
                     notificationDelegate.viewModel = viewModel
                     if previewScreen == nil {
@@ -74,19 +73,19 @@ enum MainAppTab: Hashable, CaseIterable {
 
     var title: String {
         switch self {
-        case .alarms: return "ALARMS"
-        case .calendar: return "CALENDAR"
-        case .sources: return "SOURCES"
+        case .alarms: return "Alarms"
+        case .calendar: return "Calendar"
+        case .sources: return "Sources"
         }
     }
 }
 
-/// Three paper tabs and an amber index that slides under the active one. The bar is drawn, not a
-/// system material, so it belongs to the same machined surface as everything else.
+/// Three labeled keys. The brass mark shows which one is active. The bar is inset so lists
+/// scroll clear of it.
 struct MainTabView: View {
     @ObservedObject var viewModel: AppViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedTab: MainAppTab
-    @Namespace private var indexNamespace
 
     init(viewModel: AppViewModel, initialTab: MainAppTab = .alarms) {
         self.viewModel = viewModel
@@ -94,23 +93,21 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch selectedTab {
-                case .alarms:
-                    AlarmListView(viewModel: viewModel)
-                case .calendar:
-                    HolidayCalendarView(viewModel: viewModel)
-                case .sources:
-                    SettingsView(viewModel: viewModel)
-                }
+        Group {
+            switch selectedTab {
+            case .alarms:
+                AlarmListView(viewModel: viewModel)
+            case .calendar:
+                HolidayCalendarView(viewModel: viewModel)
+            case .sources:
+                SettingsView(viewModel: viewModel)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             tabBar
         }
         .background(VibePalette.paper.ignoresSafeArea())
-        .preferredColorScheme(.light)
     }
 
     private var tabBar: some View {
@@ -121,11 +118,11 @@ struct MainTabView: View {
                     tabKey(tab)
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 14)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 8)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
         }
-        .background(VibePalette.paper.opacity(0.97))
+        .background(VibePalette.paper)
     }
 
     private func tabKey(_ tab: MainAppTab) -> some View {
@@ -133,31 +130,24 @@ struct MainTabView: View {
         return Button {
             guard !isSelected else { return }
             UISelectionFeedbackGenerator().selectionChanged()
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+            withAnimation(VibeMotion.settle(reduceMotion)) {
                 selectedTab = tab
             }
         } label: {
-            VStack(spacing: 7) {
+            VStack(spacing: 6) {
                 Text(tab.title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                    .tracking(1.9)
-                    .foregroundStyle(isSelected ? VibePalette.ink : VibePalette.inkFaint)
-                Group {
-                    if isSelected {
-                        Capsule()
-                            .fill(VibePalette.amber)
-                            .frame(width: 18, height: 2.4)
-                            .matchedGeometryEffect(id: "tab-index", in: indexNamespace)
-                    } else {
-                        Color.clear.frame(width: 18, height: 2.4)
-                    }
-                }
+                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? VibePalette.ink : VibePalette.inkSoft)
+                Capsule()
+                    .fill(isSelected ? VibePalette.amber : Color.clear)
+                    .frame(width: 18, height: 3)
             }
             .frame(maxWidth: .infinity)
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(tab.title.capitalized)
+        .accessibilityLabel(tab.title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

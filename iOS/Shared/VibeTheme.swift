@@ -1,65 +1,120 @@
 import SwiftUI
+import UIKit
 
-/// The app's single art direction: "machined matte volumes".
+/// Bedside clock surfaces.
 ///
-/// Surfaces read as matte plaster and anodised aluminium under one light source in the
-/// top-left corner. Depth comes from a raised volume casting a soft shadow, or from a
-/// recessed well with an inset shadow, never from borders or glossy gradients.
-/// There is exactly one accent: a warm amber used for the active index and the single
-/// primary action. Everything else is a warm grey drawn from the paper tone.
+/// Daylight is warm paper. Night is a charcoal case. One brass index marks the active
+/// choice. Depth is a shallow well or a single soft shadow plus a hairline, and the
+/// palette raises contrast for the Increase Contrast setting.
 public enum VibePalette {
-    /// The page. A warm plaster paper, deliberately not pure white.
-    public static let paper = Color(red: 0.949, green: 0.937, blue: 0.914)
-    /// A raised volume catching the light.
-    public static let paperRaised = Color(red: 0.980, green: 0.973, blue: 0.957)
-    /// A volume turned slightly away from the light.
-    public static let paperDeep = Color(red: 0.902, green: 0.886, blue: 0.855)
-    /// The floor of a recessed well.
-    public static let well = Color(red: 0.871, green: 0.851, blue: 0.812)
+    public static let paper = dynamic(
+        light: rgb(0.953, 0.941, 0.918),
+        dark: rgb(0.078, 0.075, 0.067),
+        lightHigh: .white,
+        darkHigh: .black
+    )
+    public static let paperRaised = dynamic(
+        light: rgb(0.984, 0.976, 0.965),
+        dark: rgb(0.118, 0.110, 0.102),
+        lightHigh: .white,
+        darkHigh: rgb(0.08, 0.08, 0.08)
+    )
+    public static let paperDeep = dynamic(
+        light: rgb(0.910, 0.894, 0.863),
+        dark: rgb(0.145, 0.137, 0.125),
+        lightHigh: rgb(0.94, 0.94, 0.94),
+        darkHigh: rgb(0.12, 0.12, 0.12)
+    )
+    public static let well = dynamic(
+        light: rgb(0.902, 0.882, 0.847),
+        dark: rgb(0.055, 0.051, 0.047),
+        lightHigh: rgb(0.90, 0.90, 0.90),
+        darkHigh: .black
+    )
 
-    /// Primary text and engraved numerals.
-    public static let ink = Color(red: 0.153, green: 0.141, blue: 0.125)
-    /// Secondary text.
-    public static let inkSoft = Color(red: 0.420, green: 0.396, blue: 0.353)
-    /// Captions, unit labels, inactive neighbours.
-    public static let inkFaint = Color(red: 0.596, green: 0.565, blue: 0.506)
+    public static let ink = dynamic(
+        light: rgb(0.110, 0.098, 0.086),
+        dark: rgb(0.965, 0.945, 0.910),
+        lightHigh: .black,
+        darkHigh: .white
+    )
+    public static let inkSoft = dynamic(
+        light: rgb(0.306, 0.286, 0.259),
+        dark: rgb(0.824, 0.796, 0.749),
+        lightHigh: rgb(0.15, 0.15, 0.15),
+        darkHigh: rgb(0.95, 0.95, 0.95)
+    )
+    public static let inkFaint = dynamic(
+        light: rgb(0.369, 0.345, 0.310),
+        dark: rgb(0.718, 0.686, 0.639),
+        lightHigh: rgb(0.22, 0.22, 0.22),
+        darkHigh: rgb(0.90, 0.90, 0.90)
+    )
 
-    /// An engraved hairline.
-    public static let hairline = Color(red: 0.478, green: 0.439, blue: 0.376).opacity(0.30)
+    public static let hairline = dynamic(
+        light: rgb(0.110, 0.098, 0.086, 0.16),
+        dark: rgb(0.965, 0.945, 0.910, 0.18),
+        lightHigh: rgb(0, 0, 0, 0.35),
+        darkHigh: rgb(1, 1, 1, 0.40)
+    )
 
-    /// The one accent.
-    public static let amber = Color(red: 0.729, green: 0.443, blue: 0.149)
-    /// A wash of the accent, used only behind a selected disc.
-    public static let amberWash = Color(red: 0.729, green: 0.443, blue: 0.149).opacity(0.14)
+    /// Brass index. Dark enough for text on the daylight face, light enough on the night case.
+    public static let amber = dynamic(
+        light: rgb(0.478, 0.294, 0.086),
+        dark: rgb(0.941, 0.761, 0.478),
+        lightHigh: rgb(0.361, 0.220, 0.059),
+        darkHigh: rgb(1.0, 0.906, 0.722)
+    )
+    public static let amberWash = dynamic(
+        light: rgb(0.478, 0.294, 0.086, 0.12),
+        dark: rgb(0.941, 0.761, 0.478, 0.16),
+        lightHigh: rgb(0.361, 0.220, 0.059, 0.16),
+        darkHigh: rgb(1.0, 0.906, 0.722, 0.20)
+    )
 
-    /// Shadow colour. Warm, never neutral black.
-    public static let shadow = Color(red: 0.235, green: 0.196, blue: 0.129)
+    public static let shadow = dynamic(
+        light: rgb(0.145, 0.118, 0.078),
+        dark: .black,
+        lightHigh: .black,
+        darkHigh: .black
+    )
+
+    private static func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> UIColor {
+        UIColor(red: r, green: g, blue: b, alpha: a)
+    }
+
+    private static func dynamic(light: UIColor, dark: UIColor, lightHigh: UIColor, darkHigh: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            let high = traits.accessibilityContrast == .high
+            if traits.userInterfaceStyle == .dark {
+                return high ? darkHigh : dark
+            }
+            return high ? lightHigh : light
+        })
+    }
 }
 
 // MARK: - Typography
 
 public extension Font {
-    /// Numerals: light weight, monospaced digits, generous tracking handled per use.
-    static func vibeNumber(_ size: CGFloat, weight: Font.Weight = .light) -> Font {
-        .system(size: size, weight: weight)
+    static func vibeNumber(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
     }
 }
 
 public extension View {
-    /// Small-caps section and unit labels: 10 pt, wide tracking, faint ink.
+    /// Secondary label. Sentence case, footnote size, no tracking.
     func vibeCaption(_ tone: Color = VibePalette.inkFaint) -> some View {
         self
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(1.9)
+            .font(.footnote.weight(.semibold))
             .foregroundStyle(tone)
     }
 
-    /// A hairline that reads as an engraved groove rather than a border.
     func engravedDivider(_ inset: CGFloat = 0) -> some View {
         self.overlay(alignment: .bottom) {
             Rectangle()
                 .fill(VibePalette.hairline)
-                .frame(height: 0.6)
+                .frame(height: 0.5)
                 .padding(.leading, inset)
                 .allowsHitTesting(false)
         }
@@ -68,8 +123,7 @@ public extension View {
 
 // MARK: - Volume Styles
 
-/// A raised machined plate: soft shadow below-right, a one-pixel light catch above-left,
-/// a barely visible machined edge. No gloss, no glass.
+/// A raised plate: one soft shadow and a hairline. No gloss.
 public struct MachinedPlate: ViewModifier {
     let corner: CGFloat
     let raised: Bool
@@ -78,30 +132,23 @@ public struct MachinedPlate: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [VibePalette.paperRaised, VibePalette.paperDeep],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .fill(VibePalette.paperRaised)
                     .shadow(
-                        color: VibePalette.shadow.opacity(raised ? 0.18 : 0.08),
-                        radius: raised ? 9 : 4,
-                        x: -1.5,
-                        y: raised ? 6 : 2
+                        color: VibePalette.shadow.opacity(raised ? 0.10 : 0.04),
+                        radius: raised ? 6 : 2,
+                        x: 0,
+                        y: raised ? 3 : 1
                     )
-                    .shadow(color: Color.white.opacity(0.75), radius: 1.2, x: -1, y: -1.2)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .strokeBorder(VibePalette.hairline.opacity(0.55), lineWidth: 0.5)
+                    .strokeBorder(VibePalette.hairline, lineWidth: 0.5)
                     .allowsHitTesting(false)
             )
     }
 }
 
-/// A recessed well: the floor sits below the page and the top edge falls into shadow.
+/// A recessed well with a shallow inner shadow.
 public struct RecessedWell: ViewModifier {
     let corner: CGFloat
 
@@ -110,20 +157,13 @@ public struct RecessedWell: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .fill(
-                        VibePalette.paperDeep.shadow(
-                            .inner(color: VibePalette.shadow.opacity(0.22), radius: 6, x: 0, y: 3)
+                        VibePalette.well.shadow(
+                            .inner(color: VibePalette.shadow.opacity(0.16), radius: 3, x: 0, y: 1)
                         )
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: corner, style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [Color.clear, Color.white.opacity(0.75)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1
-                            )
+                            .strokeBorder(VibePalette.hairline, lineWidth: 0.5)
                             .allowsHitTesting(false)
                     )
             )
@@ -131,59 +171,37 @@ public struct RecessedWell: ViewModifier {
 }
 
 public extension View {
-    func machinedPlate(corner: CGFloat = 15, raised: Bool = true) -> some View {
+    func machinedPlate(corner: CGFloat = 14, raised: Bool = true) -> some View {
         modifier(MachinedPlate(corner: corner, raised: raised))
     }
 
-    func recessedWell(corner: CGFloat = 20) -> some View {
+    func recessedWell(corner: CGFloat = 16) -> some View {
         modifier(RecessedWell(corner: corner))
     }
 }
 
-// MARK: - Machined Key Button Style
+// MARK: - Key Button Style
 
-/// The quick-action keys on the home screen and the widget: three milled keys that
-/// travel a fraction of a millimetre and lose their shadow when pressed.
 public struct MachinedKeyButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [VibePalette.paperRaised, VibePalette.paperDeep],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .shadow(
-                        color: VibePalette.shadow.opacity(configuration.isPressed ? 0.10 : 0.20),
-                        radius: configuration.isPressed ? 3 : 8,
-                        x: -1,
-                        y: configuration.isPressed ? 2 : 5
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .strokeBorder(VibePalette.hairline.opacity(0.55), lineWidth: 0.5)
-            )
-            .scaleEffect(configuration.isPressed ? 0.985 : 1.0)
-            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+            .offset(y: configuration.isPressed && !reduceMotion ? 1 : 0)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
 // MARK: - Legacy Aliases
 
 public extension Color {
-    /// Historic name for the single accent, kept so every call site reads the same.
     static let vibeAccent = VibePalette.amber
 }
 
 // MARK: - Hairline
 
-/// A single engraved groove used to separate rows. Never a box.
 public struct Hairline: View {
     let inset: CGFloat
 
@@ -193,8 +211,8 @@ public struct Hairline: View {
 
     public var body: some View {
         Rectangle()
-            .fill(VibePalette.hairline.opacity(0.80))
-            .frame(height: 0.6)
+            .fill(VibePalette.hairline)
+            .frame(height: 0.5)
             .padding(.leading, inset)
             .allowsHitTesting(false)
     }
@@ -202,7 +220,6 @@ public struct Hairline: View {
 
 // MARK: - Caption
 
-/// Small-caps group caption used instead of a boxed card header.
 public struct GroupCaption: View {
     let text: String
 
@@ -211,7 +228,13 @@ public struct GroupCaption: View {
     }
 
     public var body: some View {
-        Text(text.uppercased())
+        Text(text)
             .vibeCaption()
+    }
+}
+
+enum VibeMotion {
+    static func settle(_ reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.18)
     }
 }

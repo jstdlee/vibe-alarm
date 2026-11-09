@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Redesign the iOS app as a restrained bedside clock: a large time, three tomorrow keys, and drums for the hour and minute. Alarm scheduling, storage, permissions, and the holiday engine are unchanged. Light and dark appearances both follow the same materials.
+
 ## v0.2.0
 
 - **Braun / Apple Industrial Light Aesthetic**: Redesigned the entire interface in a crisp Apple + Dieter Rams light theme (`#F5F5F7` alabaster canvas, `#FFFFFF` cards, precision `#ECECEF` anodized dials, and `#FF5500` International Orange accents).

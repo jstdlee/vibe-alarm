@@ -11,6 +11,7 @@ import VibeAlarmCore
 /// an instrument face rather than a widget.
 public struct HolidayCalendarView: View {
     @ObservedObject var viewModel: AppViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var displayedYear: Int
     @State private var displayedMonth: Int
@@ -44,7 +45,7 @@ public struct HolidayCalendarView: View {
                         .padding(.top, 28)
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 130)
+                .padding(.bottom, 24)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(VibePalette.paper.ignoresSafeArea())
@@ -66,12 +67,10 @@ public struct HolidayCalendarView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(alignment: .bottom) {
+        HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("VIBE ALARM")
-                    .vibeCaption()
                 Text("Calendar")
-                    .font(.system(size: 34, weight: .light))
+                    .font(.largeTitle.weight(.medium))
                     .foregroundStyle(VibePalette.ink)
             }
 
@@ -81,11 +80,11 @@ public struct HolidayCalendarView: View {
                 Button {
                     showBYOKSheet = true
                 } label: {
-                    Text("AI")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(1.3)
-                        .foregroundStyle(VibePalette.inkSoft)
-                        .frame(width: 46, height: 42)
+                    Text("Import")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(VibePalette.ink)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .padding(.horizontal, 8)
                         .machinedPlate(corner: 13)
                 }
                 .buttonStyle(KeyPressStyle())
@@ -96,9 +95,9 @@ public struct HolidayCalendarView: View {
                     showEditorSheet = true
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(VibePalette.inkSoft)
-                        .frame(width: 42, height: 42)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(VibePalette.ink)
+                        .frame(width: 44, height: 44)
                         .machinedPlate(corner: 13)
                 }
                 .buttonStyle(KeyPressStyle())
@@ -127,10 +126,11 @@ public struct HolidayCalendarView: View {
             Spacer()
 
             VStack(spacing: 3) {
-                Text(Self.monthFullNames[displayedMonth - 1].uppercased())
-                    .vibeCaption(VibePalette.inkSoft)
+                Text(Self.monthFullNames[displayedMonth - 1])
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(VibePalette.inkSoft)
                 Text(String(displayedYear))
-                    .font(.system(size: 26, weight: .light))
+                    .font(.title2.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(VibePalette.ink)
             }
@@ -149,9 +149,9 @@ public struct HolidayCalendarView: View {
             action()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(VibePalette.inkSoft)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
                 .machinedPlate(corner: 19)
         }
         .buttonStyle(KeyPressStyle())
@@ -162,8 +162,7 @@ public struct HolidayCalendarView: View {
         HStack(spacing: 0) {
             ForEach(Array(Self.weekdayHeaders.enumerated()), id: \.offset) { _, label in
                 Text(label)
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.1)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(VibePalette.inkFaint.opacity(0.85))
                     .frame(maxWidth: .infinity)
             }
@@ -204,10 +203,10 @@ public struct HolidayCalendarView: View {
         } label: {
             VStack(spacing: 4) {
                 Text("\(day)")
-                    .font(.system(size: 15, weight: isSelected ? .medium : .regular))
+                    .font(.body.weight(isSelected ? .semibold : .regular))
                     .monospacedDigit()
-                    .foregroundStyle(isSelected ? VibePalette.ink : VibePalette.ink.opacity(isToday ? 1 : 0.72))
-                    .frame(width: 32, height: 32)
+                    .foregroundStyle(VibePalette.ink)
+                    .frame(minWidth: 32, minHeight: 32)
                     .background {
                         if isSelected {
                             Circle().fill(VibePalette.paperDeep.opacity(0.9))
@@ -222,7 +221,7 @@ public struct HolidayCalendarView: View {
                     .frame(height: 6)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -239,15 +238,15 @@ public struct HolidayCalendarView: View {
                 case .publicHoliday:
                     Circle()
                         .fill(VibePalette.amber)
-                        .frame(width: 5, height: 5)
+                        .frame(width: 6, height: 6)
                 case .makeupWorkday:
                     Circle()
-                        .strokeBorder(VibePalette.inkSoft.opacity(0.75), lineWidth: 1)
-                        .frame(width: 5, height: 5)
+                        .strokeBorder(VibePalette.inkSoft, lineWidth: 1.5)
+                        .frame(width: 6, height: 6)
                 case .personalLeave:
                     Capsule()
-                        .fill(VibePalette.inkFaint)
-                        .frame(width: 7, height: 1.8)
+                        .fill(VibePalette.inkSoft)
+                        .frame(width: 8, height: 2.5)
                 }
             }
         }
@@ -255,12 +254,12 @@ public struct HolidayCalendarView: View {
 
     private var legend: some View {
         HStack(spacing: 16) {
-            legendItem(shape: AnyView(Circle().fill(VibePalette.amber).frame(width: 5, height: 5)), text: "Holiday")
+            legendItem(shape: AnyView(Circle().fill(VibePalette.amber).frame(width: 6, height: 6)), text: "Holiday")
             legendItem(
-                shape: AnyView(Circle().strokeBorder(VibePalette.inkSoft.opacity(0.75), lineWidth: 1).frame(width: 5, height: 5)),
+                shape: AnyView(Circle().strokeBorder(VibePalette.inkSoft, lineWidth: 1.5).frame(width: 6, height: 6)),
                 text: "Makeup workday"
             )
-            legendItem(shape: AnyView(Capsule().fill(VibePalette.inkFaint).frame(width: 7, height: 1.8)), text: "Leave")
+            legendItem(shape: AnyView(Capsule().fill(VibePalette.inkSoft).frame(width: 8, height: 2.5)), text: "Leave")
         }
     }
 
@@ -268,7 +267,7 @@ public struct HolidayCalendarView: View {
         HStack(spacing: 6) {
             shape
             Text(text)
-                .font(.system(size: 10.5))
+                .font(.caption)
                 .foregroundStyle(VibePalette.inkFaint)
         }
     }
@@ -278,11 +277,12 @@ public struct HolidayCalendarView: View {
     private var entriesBlock: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(listHeaderTitle.uppercased())
-                    .vibeCaption(VibePalette.inkSoft)
+                Text(listHeaderTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(VibePalette.inkSoft)
                 Spacer()
                 Text("\(listedEntries.count)")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.footnote.weight(.medium))
                     .monospacedDigit()
                     .foregroundStyle(VibePalette.inkFaint)
             }
@@ -292,7 +292,7 @@ public struct HolidayCalendarView: View {
 
             if listedEntries.isEmpty {
                 Text("No entries. Holiday feeds fill this in when they sync; you can also add a day by hand.")
-                    .font(.system(size: 12))
+                    .font(.footnote)
                     .lineSpacing(3)
                     .foregroundStyle(VibePalette.inkFaint)
                     .padding(.top, 16)
@@ -332,16 +332,16 @@ public struct HolidayCalendarView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(entry.title)
-                            .font(.system(size: 15))
+                            .font(.body)
                             .foregroundStyle(VibePalette.ink)
                             .lineLimit(1)
                         Text("\(Self.monthDayCaption(entry.date)) · \(entry.kind.displayTitle)")
-                            .font(.system(size: 11.5))
+                            .font(.footnote)
                             .foregroundStyle(VibePalette.inkFaint)
                     }
                     Spacer(minLength: 8)
                     Text(entry.source.displayName)
-                        .font(.system(size: 10.5))
+                        .font(.caption)
                         .foregroundStyle(VibePalette.inkFaint.opacity(0.9))
                         .lineLimit(1)
                 }
@@ -383,7 +383,7 @@ public struct HolidayCalendarView: View {
             m = 1
             y += 1
         }
-        withAnimation(.easeOut(duration: 0.16)) {
+        withAnimation(VibeMotion.settle(reduceMotion)) {
             displayedMonth = m
             displayedYear = y
         }
@@ -484,7 +484,7 @@ public struct HolidayEntryEditorSheet: View {
                 VStack(alignment: .leading, spacing: 20) {
                     field("Title") {
                         TextField("Holiday name", text: $title)
-                            .font(.system(size: 15))
+                            .font(.body)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 13)
                             .recessedWell(corner: 12)
@@ -508,7 +508,7 @@ public struct HolidayEntryEditorSheet: View {
 
                     field("Note") {
                         TextField("Optional", text: $note, axis: .vertical)
-                            .font(.system(size: 14))
+                            .font(.body)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 13)
                             .recessedWell(corner: 12)
@@ -519,9 +519,8 @@ public struct HolidayEntryEditorSheet: View {
                             if let existingEntry { viewModel.deleteHolidayEntry(existingEntry) }
                             dismiss()
                         } label: {
-                            Text("DELETE ENTRY")
-                                .font(.system(size: 11, weight: .semibold))
-                                .tracking(1.4)
+                            Text("Delete Entry")
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(VibePalette.inkSoft)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
@@ -555,7 +554,7 @@ public struct HolidayEntryEditorSheet: View {
 
     private func field<Content: View>(_ caption: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(caption.uppercased())
+            Text(caption)
                 .vibeCaption()
             content()
         }

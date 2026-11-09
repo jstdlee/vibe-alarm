@@ -4,10 +4,8 @@ import VibeAlarmCore
 
 /// The Sources tab: what the alarm listens to, and nothing else.
 ///
-/// The page is one column of paper with engraved hairlines between rows. Sections are separated
-/// by space and a short caption, never by a card. Anything that is simply on or off is a Toggle;
-/// the only value that needs choosing with a control other than a switch is the snooze interval,
-/// and it uses the same roller as the wake time editor.
+/// The page is one column. Sections are separated by space and a caption. Anything that is
+/// simply on or off is a Toggle. Snooze is a row of the existing intervals.
 public struct SettingsView: View {
     @ObservedObject var viewModel: AppViewModel
 
@@ -18,11 +16,8 @@ public struct SettingsView: View {
     @State private var byokStatusMessage: String?
     @State private var showAddCountrySheet = false
     @State private var showAddSubscriptionSheet = false
-    @State private var showSnoozeRoller = false
     @State private var showLeaveKeywords = false
     @State private var showBYOKDetails = false
-
-    private let snoozeOptions: [String] = AlarmRule.snoozeIntervalOptions.map { "\($0) min" }
 
     public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
@@ -32,13 +27,10 @@ public struct SettingsView: View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("VIBE ALARM")
-                        .vibeCaption()
-                        .padding(.top, 14)
                     Text("Sources")
-                        .font(.system(size: 34, weight: .light))
+                        .font(.largeTitle.weight(.medium))
                         .foregroundStyle(VibePalette.ink)
-                        .padding(.top, 6)
+                        .padding(.top, 8)
 
                     section("Holiday Calendars", top: 34) {
                         holidayCalendarRows
@@ -60,7 +52,7 @@ public struct SettingsView: View {
                         .padding(.top, 36)
                 }
                 .padding(.horizontal, 26)
-                .padding(.bottom, 120)
+                .padding(.bottom, 24)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .background(VibePalette.paper.ignoresSafeArea())
@@ -89,7 +81,7 @@ public struct SettingsView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(caption.uppercased())
+            Text(caption)
                 .vibeCaption()
                 .padding(.bottom, 10)
             Hairline()
@@ -113,11 +105,11 @@ public struct SettingsView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.body)
                         .foregroundStyle(VibePalette.ink)
                     if let detail {
                         Text(detail)
-                            .font(.system(size: 11.5))
+                            .font(.footnote)
                             .foregroundStyle(VibePalette.inkFaint)
                             .lineLimit(2)
                     }
@@ -188,11 +180,11 @@ public struct SettingsView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(sub.name)
-                        .font(.system(size: 15, weight: sub.isEnabled ? .regular : .light))
+                        .font(.body.weight(sub.isEnabled ? .regular : .light))
                         .foregroundStyle(sub.isEnabled ? VibePalette.ink : VibePalette.inkFaint)
                         .lineLimit(1)
                     Text(URL(string: sub.url)?.host ?? sub.url)
-                        .font(.system(size: 11.5))
+                        .font(.footnote)
                         .foregroundStyle(VibePalette.inkFaint)
                         .lineLimit(1)
                 }
@@ -288,24 +280,29 @@ public struct SettingsView: View {
     private var reminderRows: some View {
         VStack(spacing: 0) {
             row("Snooze Interval", detail: "Used by the notification action and the wake alarm.") {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.22)) { showSnoozeRoller.toggle() }
-                } label: {
-                    valueText("\(viewModel.snoozeMinutes) min", active: showSnoozeRoller)
-                }
-                .buttonStyle(.plain)
+                valueText("\(viewModel.snoozeMinutes) min", active: true)
             }
 
-            if showSnoozeRoller {
-                CompactRoller(
-                    caption: "Snooze",
-                    options: snoozeOptions,
-                    selectedIndex: snoozeIndex
-                ) { idx in
-                    selectSnoozeIndex(idx)
+            HStack(spacing: 8) {
+                ForEach(Array(AlarmRule.snoozeIntervalOptions.enumerated()), id: \.offset) { index, minutes in
+                    let on = index == snoozeIndex
+                    Button {
+                        selectSnoozeIndex(index)
+                    } label: {
+                        Text("\(minutes)")
+                            .font(.subheadline.weight(on ? .semibold : .regular))
+                            .monospacedDigit()
+                            .foregroundStyle(on ? VibePalette.amber : VibePalette.inkSoft)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                            .machinedPlate(corner: 12, raised: !on)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(minutes) minutes")
+                    .accessibilityAddTraits(on ? [.isSelected] : [])
                 }
-                .padding(.vertical, 12)
             }
+            .padding(.vertical, 8)
         }
     }
 
@@ -365,9 +362,8 @@ public struct SettingsView: View {
                         byokStatusMessage = await viewModel.testBYOKConnection()
                     }
                 } label: {
-                    Text("TEST CONNECTION")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(1.4)
+                    Text("Test Connection")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(VibePalette.amber)
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
@@ -380,9 +376,8 @@ public struct SettingsView: View {
                     saveAPIKey()
                     byokStatusMessage = "Key saved to the Keychain."
                 } label: {
-                    Text("SAVE KEY")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(1.4)
+                    Text("Save Key")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(VibePalette.ink)
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
@@ -393,7 +388,7 @@ public struct SettingsView: View {
 
             if let byokStatusMessage {
                 Text(byokStatusMessage)
-                    .font(.system(size: 11.5))
+                    .font(.footnote)
                     .foregroundStyle(VibePalette.inkFaint)
                     .lineSpacing(2)
             }
@@ -409,7 +404,7 @@ public struct SettingsView: View {
         isSecure: Bool
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased())
+            Text(title)
                 .vibeCaption()
             Group {
                 if isSecure {
@@ -436,7 +431,7 @@ public struct SettingsView: View {
             Hairline()
                 .padding(.bottom, 4)
             Text("Everything stays on this iPhone. No account, no server, no analytics.")
-                .font(.system(size: 11.5))
+                .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(VibePalette.inkFaint)
         }
@@ -528,9 +523,8 @@ public struct LeaveKeywordsEditorView: View {
                         viewModel.addLeaveKeyword(newKeyword)
                         newKeyword = ""
                     } label: {
-                        Text("ADD")
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(1.4)
+                        Text("Add")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(VibePalette.ink)
                             .frame(width: 78, height: 42)
                             .machinedPlate(corner: 12)
@@ -574,16 +568,15 @@ public struct AddSubscriptionSheet: View {
 
                     if let validationMessage {
                         Text(validationMessage)
-                            .font(.system(size: 11.5))
+                            .font(.footnote)
                             .foregroundStyle(.red)
                     }
 
                     Button {
                         addSubscription()
                     } label: {
-                        Text("ADD CALENDAR")
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(1.4)
+                        Text("Add Calendar")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(VibePalette.ink)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
@@ -615,7 +608,7 @@ public struct AddSubscriptionSheet: View {
         keyboard: UIKeyboardType
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased())
+            Text(title)
                 .vibeCaption()
             TextField(prompt, text: text)
                 .font(.system(size: 14))

@@ -15,13 +15,10 @@ public struct WidgetGalleryView: View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 34) {
-                    Text("VIBE ALARM")
-                        .vibeCaption()
-                        .padding(.top, 14)
                     Text("Widgets")
-                        .font(.system(size: 34, weight: .light))
+                        .font(.largeTitle.weight(.medium))
                         .foregroundStyle(VibePalette.ink)
-                        .padding(.top, -22)
+                        .padding(.top, 8)
 
                     galleryItem(caption: "Medium · today and tomorrow", width: 329, height: 155) {
                         MediumWidgetContentView(
@@ -35,7 +32,7 @@ public struct WidgetGalleryView: View {
                     }
 
                     Text("Long press a widget to reach Skip and Restore without opening the app.")
-                        .font(.system(size: 11.5))
+                        .font(.footnote)
                         .lineSpacing(3)
                         .foregroundStyle(VibePalette.inkFaint)
                         .padding(.top, 4)
@@ -57,8 +54,9 @@ public struct WidgetGalleryView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(caption.uppercased())
-                .vibeCaption(VibePalette.inkSoft)
+            Text(caption)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(VibePalette.inkSoft)
             content()
                 .padding(16)
                 .frame(width: width, height: height)

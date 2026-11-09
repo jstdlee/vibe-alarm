@@ -3,10 +3,9 @@ import VibeAlarmCore
 
 /// The wake time editor for one alarm.
 ///
-/// One column, top to bottom: the alarm's name, the instrument row (repeat, holiday, snooze), then the two big discs
-/// that fill the lower half of the display where a thumb already rests. Nothing carries a title
-/// above it: a disc prints its unit inside its reading well, and each instrument cell prints its own caption. The page is mostly empty paper on purpose, so the two
-/// volumes at the bottom are the only things asking to be touched.
+/// The chosen time is the large reading at the top. Two drums set the hour and the minute.
+/// Repeat, the holiday rule, and snooze are full-width rows. Snooze is stored immediately.
+/// The other fields are written when the person taps Save.
 public struct TimeEditorView: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
@@ -21,6 +20,7 @@ public struct TimeEditorView: View {
     @State private var onceDate: Date
 
     @State private var activeSheet: WakeOptionSheet?
+    @ScaledMetric(relativeTo: .largeTitle) private var timeSize: CGFloat = 72
 
     public init(viewModel: AppViewModel, alarmID: UUID) {
         self.init(viewModel: viewModel, alarmID: alarmID, initialSheet: nil)
@@ -57,52 +57,85 @@ public struct TimeEditorView: View {
     }
 
     public var body: some View {
-        GeometryReader { geo in
-            let isCompact = geo.size.height < 720
-            // The discs are deliberately wider than half the display. `DiscPair` seats each
-            // centre outside the bezel, so a taller phone buys air, not a bigger circle.
-            let discDiameter = min(geo.size.width * (isCompact ? 0.86 : 0.98), isCompact ? 322 : 400)
+        VStack(spacing: 0) {
+            topBar
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(alarmLabel)
+                        .font(.title2.weight(.medium))
+                        .foregroundStyle(VibePalette.ink)
+                        .lineLimit(2)
+                        .padding(.top, 8)
 
-            VStack(spacing: 0) {
-                titleBlock(isCompact: isCompact)
+                    Text(String(format: "%02d:%02d", hour, minute))
+                        .font(.system(size: timeSize, weight: .medium, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(VibePalette.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                        .accessibilityLabel("Wake time")
+                        .accessibilityValue(String(format: "%02d:%02d", hour, minute))
 
-                WakeOptionsInstrumentRow(
-                    repeatMode: repeatMode,
-                    onceDate: onceDate,
-                    holidaySmart: holidaySmart,
-                    snoozeMinutes: viewModel.snoozeMinutes,
-                    onOpen: { activeSheet = $0 },
-                    onCycleRepeat: { step in
-                        selectRepeatIndex((repeatIndex + step + 5) % 5)
-                    },
-                    onHolidayChange: { holidaySmart = $0 },
-                    onSnoozeChange: { viewModel.setSnoozeMinutes($0) }
-                )
-                .padding(.horizontal, 24)
-                .padding(.top, isCompact ? 14 : 26)
+                    HStack(alignment: .top, spacing: 12) {
+                        BedsideDrum(title: "Hour", value: $hour, upperBound: 24)
+                        BedsideDrum(title: "Minute", value: $minute, upperBound: 60)
+                    }
+                    .padding(.top, 16)
 
-                Spacer(minLength: 0)
+                    VStack(spacing: 0) {
+                        optionRow(
+                            title: "Repeat",
+                            value: AlarmFormatting.repeatTitle(repeatMode),
+                            accessibilityValue: repeatAccessibilityValue,
+                            hint: "Opens repeat options. Swipe up or down to change."
+                        ) {
+                            activeSheet = .repeatDays
+                        }
+                        .accessibilityAdjustableAction { direction in
+                            selectRepeatIndex((repeatIndex + (direction == .increment ? 1 : -1) + 5) % 5)
+                        }
 
-                DiscPair(
-                    diameter: discDiameter,
-                    leadingValue: hour,
-                    leadingCount: 24,
-                    leadingStep: 1,
-                    leadingLabel: "Hour",
-                    trailingValue: minute,
-                    trailingCount: 60,
-                    trailingStep: 5,
-                    trailingLabel: "Min",
-                    onLeadingChange: { hour = $0 },
-                    onTrailingChange: { minute = $0 }
-                )
-                .padding(.bottom, -(discDiameter * (isCompact ? 0.14 : 0.20)))
+                        Hairline()
+
+                        optionRow(
+                            title: "Holiday rule",
+                            value: holidaySmart ? "Smart skip" : "Always ring",
+                            accessibilityValue: holidaySmart ? "Smart skip on public holidays" : "Always ring",
+                            hint: "Opens holiday options. Swipe up or down to change."
+                        ) {
+                            activeSheet = .holiday
+                        }
+                        .accessibilityAdjustableAction { _ in
+                            holidaySmart.toggle()
+                        }
+
+                        Hairline()
+
+                        optionRow(
+                            title: "Snooze",
+                            value: "\(viewModel.snoozeMinutes) min",
+                            accessibilityValue: "\(viewModel.snoozeMinutes) minutes",
+                            hint: "Opens snooze options. Swipe up or down to change."
+                        ) {
+                            activeSheet = .snooze
+                        }
+                        .accessibilityAdjustableAction { direction in
+                            let options = AlarmRule.snoozeIntervalOptions
+                            let index = options.firstIndex(of: viewModel.snoozeMinutes) ?? 0
+                            let next = min(max(index + (direction == .increment ? 1 : -1), 0), options.count - 1)
+                            viewModel.setSnoozeMinutes(options[next])
+                        }
+                    }
+                    .padding(.top, 20)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 28)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(VibePalette.paper.ignoresSafeArea())
-        .overlay(alignment: .top) { topBar }
-        .statusBarHidden(false)
+        .tint(VibePalette.amber)
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .repeatDays:
@@ -115,40 +148,50 @@ public struct TimeEditorView: View {
         }
     }
 
-    // MARK: - Top Bar
-
-    /// A toolbar drawn by hand so the bar sits on the paper instead of a material block.
     private var topBar: some View {
         HStack {
             Button("Cancel") { dismiss() }
-                .font(.system(size: 15, weight: .medium))
+                .font(.body)
                 .foregroundStyle(VibePalette.inkSoft)
+                .frame(minHeight: 44)
             Spacer()
             Button("Save") { save() }
-                .font(.system(size: 15, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(VibePalette.amber)
+                .frame(minHeight: 44)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 6)
+        .padding(.horizontal, 20)
     }
 
-    // MARK: - Title
-
-    /// The alarm's own name is the page title. The time itself is on the discs, so there is no
-    /// second, larger copy of it here to compete with them.
-    private func titleBlock(isCompact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text("WAKE TIME")
-                .vibeCaption()
-            Text(alarmLabel)
-                .font(.system(size: isCompact ? 26 : 30, weight: .light))
-                .foregroundStyle(VibePalette.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+    private func optionRow(
+        title: String,
+        value: String,
+        accessibilityValue: String,
+        hint: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(VibePalette.ink)
+                Spacer(minLength: 8)
+                Text(value)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(VibePalette.inkSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(VibePalette.inkFaint)
+            }
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
-        .padding(.top, isCompact ? 40 : 52)
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityHint(hint)
     }
 
     private var repeatIndex: Int {
@@ -161,6 +204,16 @@ public struct TimeEditorView: View {
         }
     }
 
+    private var repeatAccessibilityValue: String {
+        if case .specificDates = repeatMode {
+            return "Once, \(onceDate.formatted(.dateTime.month(.abbreviated).day()))"
+        }
+        if case .customDays(let days) = repeatMode {
+            return days.sorted().map(\.shortWeekdayName).joined(separator: ", ")
+        }
+        return AlarmFormatting.repeatTitle(repeatMode)
+    }
+
     private func selectRepeatIndex(_ idx: Int) {
         switch idx {
         case 0: repeatMode = .weekdays
@@ -171,8 +224,6 @@ public struct TimeEditorView: View {
         default: break
         }
     }
-
-    // MARK: - Save
 
     private func save() {
         viewModel.updateAlarm(id: alarmID) { rule in

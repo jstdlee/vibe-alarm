@@ -80,20 +80,21 @@ public struct SmallWidgetContentView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("TOMORROW")
-                .vibeCaption(VibePalette.inkFaint)
+            Text("Tomorrow")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(VibePalette.inkFaint)
 
             Spacer(minLength: 4)
 
             Text(widgetTimeText(tomorrow))
-                .font(.system(size: 34, weight: .light))
+                .font(.system(size: 34, weight: .medium, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(tomorrow.status.isRinging ? VibePalette.ink : VibePalette.inkFaint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
 
             Text(widgetStateLine(tomorrow))
-                .font(.system(size: 10.5))
+                .font(.caption)
                 .foregroundStyle(VibePalette.inkSoft)
                 .lineLimit(1)
 
@@ -131,11 +132,11 @@ public struct MediumWidgetContentView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 18) {
-                dayColumn(today, label: "TODAY")
+                dayColumn(today, label: "Today")
                 Rectangle()
                     .fill(VibePalette.hairline)
                     .frame(width: 0.6)
-                dayColumn(tomorrow, label: "TOMORROW")
+                dayColumn(tomorrow, label: "Tomorrow")
             }
 
             HStack(spacing: 7) {
@@ -170,17 +171,18 @@ public struct MediumWidgetContentView: View {
     private func dayColumn(_ day: ResolvedDayAlarm, label: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
-                .vibeCaption(VibePalette.inkFaint)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(VibePalette.inkFaint)
 
             Text(widgetTimeText(day))
-                .font(.system(size: 28, weight: .light))
+                .font(.system(size: 28, weight: .medium, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(day.status.isRinging ? VibePalette.ink : VibePalette.inkFaint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
 
             Text(widgetStateLine(day))
-                .font(.system(size: 10.5))
+                .font(.caption)
                 .foregroundStyle(VibePalette.inkSoft)
                 .lineLimit(1)
         }

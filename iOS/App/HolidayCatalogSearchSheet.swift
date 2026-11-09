@@ -31,11 +31,11 @@ public struct HolidayCatalogSearchSheet: View {
                         .padding(.top, 6)
 
                     HStack {
-                        Text(query.isEmpty ? "ALL COUNTRIES" : "RESULTS")
+                        Text(query.isEmpty ? "All countries" : "Results")
                             .vibeCaption(VibePalette.inkSoft)
                         Spacer()
                         Text("\(results.count)")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.footnote.weight(.medium))
                             .monospacedDigit()
                             .foregroundStyle(VibePalette.inkFaint)
                     }
@@ -72,7 +72,7 @@ public struct HolidayCatalogSearchSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
                 TextField("Country or code", text: $query)
-                    .font(.system(size: 15))
+                    .font(.body)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .foregroundStyle(VibePalette.ink)
@@ -81,9 +81,9 @@ public struct HolidayCatalogSearchSheet: View {
                         query = ""
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.footnote.weight(.bold))
                             .foregroundStyle(VibePalette.inkFaint)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Clear Search")
@@ -107,19 +107,18 @@ public struct HolidayCatalogSearchSheet: View {
             } label: {
                 HStack(alignment: .center, spacing: 14) {
                     Text(item.isoCode)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .tracking(1)
+                        .font(.footnote.weight(.semibold).monospaced())
                         .foregroundStyle(VibePalette.inkFaint)
                         .frame(width: 26, alignment: .leading)
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.countryName)
-                            .font(.system(size: 15, weight: subscribed ? .light : .regular))
+                            .font(.body.weight(subscribed ? .light : .regular))
                             .foregroundStyle(subscribed ? VibePalette.inkSoft : VibePalette.ink)
                             .multilineTextAlignment(.leading)
                             .lineLimit(2)
                         Text(secondaryLine(for: item))
-                            .font(.system(size: 11))
+                            .font(.footnote)
                             .foregroundStyle(VibePalette.inkFaint)
                             .lineLimit(1)
                     }
@@ -127,14 +126,12 @@ public struct HolidayCatalogSearchSheet: View {
                     Spacer(minLength: 8)
 
                     if subscribed {
-                        Text("ADDED")
-                            .font(.system(size: 9.5, weight: .semibold))
-                            .tracking(1.3)
+                        Text("Added")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(VibePalette.inkFaint)
                     } else {
-                        Text("ADD")
-                            .font(.system(size: 9.5, weight: .semibold))
-                            .tracking(1.3)
+                        Text("Add")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(VibePalette.amber)
                     }
                 }
