@@ -22,7 +22,7 @@ public struct AlarmListView: View {
                 } header: {
                     Text("Tomorrow")
                 } footer: {
-                    Text("Overrides apply to tomorrow only, and clear themselves the day after. Everything is computed on this iPhone.")
+                    Text(tomorrowFooter)
                 }
 
                 Section("Alarms") {
@@ -95,6 +95,26 @@ public struct AlarmListView: View {
         .buttonStyle(.bordered)
         .controlSize(.large)
         .disabled(!enabled)
+        .accessibilityHint(actionHint(title: title, enabled: enabled))
+    }
+
+    /// Skip and +10 min act only on a tomorrow that will ring. Restore clears a
+    /// manual skip or delay, so it stays off when the holiday engine already did.
+    private func actionHint(title: String, enabled: Bool) -> String {
+        if enabled { return "Applies to tomorrow only" }
+        if title == "Restore" { return "Available after a skip or delay" }
+        return "Unavailable because tomorrow will not ring"
+    }
+
+    private var tomorrowFooter: String {
+        let kept = "The change clears itself the day after. Everything is computed on this iPhone."
+        if !tomorrowWillRing {
+            return "Tomorrow will not ring, so Skip and +10 min are off. Restore is available after a skip or delay. \(kept)"
+        }
+        if !hasOverride {
+            return "Skip and +10 min change tomorrow only. Restore is available after a skip or delay. \(kept)"
+        }
+        return "Restore clears the skip or delay on tomorrow. \(kept)"
     }
 
     // MARK: - Rows

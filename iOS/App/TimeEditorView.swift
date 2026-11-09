@@ -57,8 +57,11 @@ public struct TimeEditorView: View {
     }
 
     public var body: some View {
-        NavigationStack {
-            Form {
+        // The tall simulator proposes a zero window on the first pass. A geometry
+        // reader subscribes to the real size so the editor replaces the launch screen.
+        GeometryReader { proxy in
+            NavigationStack {
+                Form {
                 Section {
                     Text(String(format: "%02d:%02d", hour, minute))
                         .font(.system(size: timeSize, weight: .regular))
@@ -143,6 +146,8 @@ public struct TimeEditorView: View {
                         onceDate: $onceDate
                     )
                 }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
             }
         }
     }
