@@ -114,13 +114,22 @@ struct BedsideDisc: View {
 
     // MARK: - Plate
 
+    /// The plate is a loose bundle image, not an asset catalog, so the app does not
+    /// need an AppIcon set. `UIImage(named:)` finds `BedsideDialPlateLight.png`.
     private var plate: some View {
-        Image(dark ? "BedsideDialPlateDark" : "BedsideDialPlateLight")
-            .resizable()
-            .interpolation(.high)
-            .frame(width: diameter, height: diameter)
-            .accessibilityHidden(true)
-            .allowsHitTesting(false)
+        let name = dark ? "BedsideDialPlateDark" : "BedsideDialPlateLight"
+        return Group {
+            if let image = UIImage(named: name) {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.high)
+            } else {
+                Circle().fill(dark ? Color(white: 0.1) : Color(red: 0.95, green: 0.93, blue: 0.90))
+            }
+        }
+        .frame(width: diameter, height: diameter)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
     }
 
     // MARK: - Scale

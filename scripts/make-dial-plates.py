@@ -19,8 +19,8 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-LIGHT = ROOT / "iOS/App/Assets.xcassets/BedsideDialPlateLight.imageset/plate.png"
-DARK = ROOT / "iOS/App/Assets.xcassets/BedsideDialPlateDark.imageset/plate.png"
+LIGHT = ROOT / "iOS/App/BedsideDialPlateLight.png"
+DARK = ROOT / "iOS/App/BedsideDialPlateDark.png"
 
 # Keep in sync with BedsidePlateMetrics.ringInner.
 RING_INNER = 0.818
