@@ -197,6 +197,7 @@ capture_screen() {
 }
 
 BASE_OUT="$OUT_DIR"
+xcrun simctl ui "$UDID" appearance light 2>/dev/null || true
 for theme in standard bedside; do
   THEME="$theme"
   OUT_DIR="$BASE_OUT/$theme"
@@ -211,6 +212,17 @@ for theme in standard bedside; do
   capture_screen "search"   "06-holiday-catalog"
   capture_screen "byok"     "07-parse-notice"
 done
+
+# The editor is the screen whose materials change between light and dark.
+# One extra frame per appearance is enough to check the discs; the light set above stays light.
+xcrun simctl ui "$UDID" appearance dark 2>/dev/null || true
+for theme in standard bedside; do
+  THEME="$theme"
+  OUT_DIR="$BASE_OUT/$theme"
+  echo "Capturing dark editor for $theme"
+  capture_screen "editor" "02-wake-time-editor-dark"
+done
+xcrun simctl ui "$UDID" appearance light 2>/dev/null || true
 
 ls -lh "$OUT_DIR"
 exit "$FAILED"

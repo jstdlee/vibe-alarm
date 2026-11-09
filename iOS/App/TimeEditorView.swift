@@ -3,8 +3,9 @@ import VibeAlarmCore
 
 /// The wake time editor for one alarm.
 ///
-/// Hour and minute are edited with the system wheel. Repeat, the holiday rule, and snooze stay
-/// available. Snooze is stored immediately, matching the previous editor. The other fields are
+/// Standard edits the hour and minute with the system wheel. Bedside Clock uses two rotary
+/// discs along the bottom edge: hour on the left, minute on the right. Repeat, the holiday
+/// rule, and snooze stay available. Snooze is stored immediately. The other fields are
 /// written when the person taps Save.
 public struct TimeEditorView: View {
     @ObservedObject var viewModel: AppViewModel
@@ -21,6 +22,8 @@ public struct TimeEditorView: View {
 
     @Environment(\.appearanceStyle) private var appearanceStyle
     @Environment(\.vibeTokens) private var tokens
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
     @State private var activeSheet: WakeOptionSheet?
     @ScaledMetric(relativeTo: .largeTitle) private var timeSize: CGFloat = 56
 
@@ -156,70 +159,86 @@ public struct TimeEditorView: View {
         }
     }
 
+    /// Cancel and Save sit on the paper. The name and the option plate stay up
+    /// top. The hour and minute discs fill the bottom, with their lower halves
+    /// off the screen.
     private var bedsideBody: some View {
         GeometryReader { proxy in
+            let isCompact = proxy.size.height < 720
+            let discDiameter = min(proxy.size.width * (isCompact ? 0.86 : 0.98), isCompact ? 322 : 400)
             VStack(spacing: 0) {
-                HStack {
-                    Button("Cancel") { dismiss() }
-                        .font(.body)
-                        .foregroundStyle(tokens.inkSoft)
-                        .frame(minHeight: 44)
-                    Spacer()
-                    Button("Save") { save() }
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(tokens.accent)
-                        .frame(minHeight: 44)
-                }
-                .padding(.horizontal, 20)
+                bedsideTitle(isCompact: isCompact)
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(alarmLabel)
-                            .font(.title2.weight(.medium))
-                            .foregroundStyle(tokens.ink)
-                            .lineLimit(2)
-                            .padding(.top, 8)
+                BedsideInstrumentRow(
+                    repeatMode: repeatMode,
+                    onceDate: onceDate,
+                    holidaySmart: holidaySmart,
+                    snoozeMinutes: viewModel.snoozeMinutes,
+                    accent: BedsideDialColor.accent(scheme: colorScheme, contrast: contrast),
+                    onOpen: { activeSheet = $0 },
+                    onCycleRepeat: { step in
+                        selectRepeatIndex((repeatIndex + step + 5) % 5)
+                    },
+                    onHolidayChange: { holidaySmart = $0 },
+                    onSnoozeChange: { viewModel.setSnoozeMinutes($0) }
+                )
+                .padding(.horizontal, 24)
+                .padding(.top, isCompact ? 14 : 26)
 
-                        Text(String(format: "%02d:%02d", hour, minute))
-                            .font(.system(size: timeSize, weight: tokens.timeWeight, design: tokens.timeDesign))
-                            .monospacedDigit()
-                            .foregroundStyle(tokens.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 8)
-                            .accessibilityLabel("Wake time")
-                            .accessibilityValue(String(format: "%02d:%02d", hour, minute))
+                Spacer(minLength: 0)
 
-                        HStack(alignment: .top, spacing: 12) {
-                            BedsideDrum(title: "Hour", value: $hour, upperBound: 24)
-                            BedsideDrum(title: "Minute", value: $minute, upperBound: 60)
-                        }
-                        .padding(.top, 16)
-
-                        VStack(spacing: 0) {
-                            bedsideOption("Repeat", value: AlarmFormatting.repeatTitle(repeatMode)) {
-                                activeSheet = .repeatDays
-                            }
-                            bedsideOption("Holiday rule", value: holidaySmart ? "Smart skip" : "Always ring") {
-                                activeSheet = .holiday
-                            }
-                            bedsideOption("Snooze", value: "\(viewModel.snoozeMinutes) min") {
-                                activeSheet = .snooze
-                            }
-                        }
-                        .padding(.top, 20)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
-                }
+                BedsideDiscPair(
+                    diameter: discDiameter,
+                    hour: hour,
+                    minute: minute,
+                    onHourChange: { hour = $0 },
+                    onMinuteChange: { minute = $0 }
+                )
+                .padding(.bottom, -(discDiameter * (isCompact ? 0.14 : 0.20)))
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
-            .background(tokens.paper.ignoresSafeArea())
         }
+        .background(tokens.paper.ignoresSafeArea())
+        .overlay(alignment: .top) { bedsideTopBar }
         .sheet(item: $activeSheet) { sheet in
             optionSheet(sheet)
         }
+    }
+
+    private var bedsideTopBar: some View {
+        HStack {
+            Button("Cancel") { dismiss() }
+                .buttonStyle(.plain)
+                .font(.body)
+                .foregroundStyle(tokens.inkSoft)
+                .frame(minHeight: 44)
+            Spacer()
+            Button("Save") { save() }
+                .buttonStyle(.plain)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(BedsideDialColor.accent(scheme: colorScheme, contrast: contrast))
+                .frame(minHeight: 44)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 6)
+    }
+
+    private func bedsideTitle(isCompact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("WAKE TIME")
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(1.6)
+                .foregroundStyle(tokens.inkFaint)
+            Text(alarmLabel)
+                .font(.system(size: isCompact ? 28 : 34, weight: .regular))
+                .foregroundStyle(tokens.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 24)
+        .padding(.top, isCompact ? 44 : 54)
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -231,29 +250,6 @@ public struct TimeEditorView: View {
             HolidayOptionSheet(smart: $holidaySmart)
         case .snooze:
             SnoozeOptionSheet(minutes: viewModel.snoozeMinutes) { viewModel.setSnoozeMinutes($0) }
-        }
-    }
-
-    private func bedsideOption(_ title: String, value: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(tokens.ink)
-                Spacer()
-                Text(value)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(tokens.inkSoft)
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(tokens.inkFaint)
-            }
-            .frame(minHeight: 52)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(tokens.hairline).frame(height: 0.5)
         }
     }
 

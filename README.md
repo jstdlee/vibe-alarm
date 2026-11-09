@@ -6,7 +6,7 @@
 ![iOS 17.0+](https://img.shields.io/badge/iOS-17.0%2B-E8E2D8?logo=apple&logoColor=black)
 ![SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%C2%B7%20WidgetKit-B4622D?logo=swift)
 
-> **Two appearances, one alarm.** Standard is the default: system lists, a wheel for the time, and the iPhone light, dark, and contrast settings. Bedside Clock is the alternate: a large time, hour and minute drums, and warm paper or a charcoal case. Choose Appearance at the top of Sources. The choice is stored on this iPhone and applies immediately, including the Home Screen widgets.
+> **Two appearances, one alarm.** Standard is the default: system lists, a wheel for the time, and the iPhone light, dark, and contrast settings. Bedside Clock is the alternate: warm paper or a charcoal case, and two rotary discs for the hour and the minute. Choose Appearance at the top of Sources. The choice is stored on this iPhone and applies immediately, including the Home Screen widgets.
 
 ---
 
@@ -52,7 +52,7 @@ The pictures below are the previous interface. Current captures are produced by 
 ## Core Features
 
 1. **Alarms list with next-day quick keys** — `Skip`, `+10 min` and `Restore` apply to tomorrow only and clear themselves the day after.
-2. **Appearance** — Standard uses system controls and a wheel for the wake time. Bedside Clock uses a large time, drums for the hour and minute, and a paper or charcoal surface. Sources → Appearance stores the choice in the App Group.
+2. **Appearance** — Standard uses system controls and a wheel for the wake time. Bedside Clock uses a paper or charcoal surface and two half-discs, hour and minute, for the wake time. Sources → Appearance stores the choice in the App Group.
 3. **Three-source holiday engine, all on device**:
    - External `.ics` subscriptions, including China's statutory holidays and makeup workdays, Singapore MOM, and a searchable catalog of 54 national feeds. Google feeds are classified so observances and regional-only days do not silently skip a workday.
    - Read-only `EventKit` scanning of chosen calendars against leave keywords.
