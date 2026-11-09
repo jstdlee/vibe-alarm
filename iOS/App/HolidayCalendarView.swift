@@ -269,6 +269,8 @@ public struct HolidayCalendarView: View {
             Text(text)
                 .font(.caption)
                 .foregroundStyle(VibePalette.inkFaint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
     }
 
