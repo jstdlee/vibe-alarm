@@ -57,6 +57,9 @@ public struct TimeEditorView: View {
     }
 
     public var body: some View {
+        // The tall simulator proposes a zero window on the first pass. A geometry
+        // reader subscribes to the real size so the editor replaces the launch screen.
+        GeometryReader { proxy in
         VStack(spacing: 0) {
             topBar
             ScrollView(.vertical, showsIndicators: false) {
@@ -134,6 +137,7 @@ public struct TimeEditorView: View {
                 .padding(.bottom, 28)
             }
         }
+        .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
         .background(VibePalette.paper.ignoresSafeArea())
         .tint(VibePalette.amber)
         .sheet(item: $activeSheet) { sheet in
@@ -145,6 +149,7 @@ public struct TimeEditorView: View {
             case .snooze:
                 SnoozeOptionSheet(minutes: viewModel.snoozeMinutes) { viewModel.setSnoozeMinutes($0) }
             }
+        }
         }
     }
 

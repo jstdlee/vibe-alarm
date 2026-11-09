@@ -195,7 +195,7 @@ public struct AlarmListView: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 8) {
             Hairline()
-            Text("Overrides apply to tomorrow only, and clear themselves the day after. Everything is computed on this iPhone.")
+            Text(tomorrowFooter)
                 .font(.footnote)
                 .foregroundStyle(VibePalette.inkFaint)
                 .fixedSize(horizontal: false, vertical: true)
@@ -215,6 +215,17 @@ public struct AlarmListView: View {
             .filter { $0.rule.isEnabled }
             .map(\.tomorrow)
             .first
+    }
+
+    private var tomorrowFooter: String {
+        let kept = "The change clears itself the day after. Everything is computed on this iPhone."
+        if !tomorrowWillRing {
+            return "Tomorrow will not ring, so Skip and +10 min are off. Restore is available after a skip or delay. \(kept)"
+        }
+        if !hasOverride {
+            return "Skip and +10 min change tomorrow only. Restore is available after a skip or delay. \(kept)"
+        }
+        return "Restore clears the skip or delay on tomorrow. \(kept)"
     }
 
     private var tomorrowStateSummary: String {
