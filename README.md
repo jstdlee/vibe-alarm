@@ -6,13 +6,13 @@
 ![iOS 17.0+](https://img.shields.io/badge/iOS-17.0%2B-E8E2D8?logo=apple&logoColor=black)
 ![SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%C2%B7%20WidgetKit-B4622D?logo=swift)
 
-> **Design language: machined matte volumes.** A warm plaster paper ground, matte discs that sit in a recessed well and cast one soft shadow from a single light source, engraved hairline grooves, and exactly one accent — a warm amber used for the active index and the single primary action. Depth comes from shadow and well, never from borders or glass. Motion is weighted: a dial turns like a heavy object.
+> **Design language: system iOS.** Standard tab bar, navigation bar, inset grouped lists, and system controls. Semantic colors follow light mode, dark mode, and Increase Contrast. Bars and controls pick up the system material, including Liquid Glass on iOS 26 and the refreshed materials in iOS 27, when the app is built with the current SDK. The deployment target stays iOS 17, so the code calls only APIs available since that release and does not draw its own glass.
 
 ---
 
 ## iOS Simulator Screenshots
 
-Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`, in light appearance. Every screen is also captured on a 375 x 667 phone (`docs/screenshots/small/`).
+The images checked in under `docs/screenshots/` are the previous machined-matte interface. This redesign was made on a machine without an iOS Simulator, so those files are not presented as the new UI. GitHub Actions builds `VibeAlarm.app` on `macos-26` and uploads a fresh light-appearance capture, including a 375 x 667 phone, with the unsigned IPA.
 
 <p align="center">
   <img src="docs/screenshots/01-alarms.png" width="19%" alt="Alarms">
@@ -30,12 +30,12 @@ Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`
 | 1. Alarms | 2. Wake Time |
 | :---: | :---: |
 | <img src="docs/screenshots/01-alarms.png" width="88%" alt="Alarms list"> | <img src="docs/screenshots/02-wake-time-editor.png" width="88%" alt="Wake time editor"> |
-| The home screen is an alarms list. Above it sit three machined quick keys — `Skip`, `+10 min`, `Restore` — that act on tomorrow only. Each row shows the alarm's large time, its repeat summary, today and tomorrow's effective state, and a real toggle. | Two large engraved discs fill the lower half for the hour and the minute, sized for a thumb on each edge. Repeat, Holiday Rule and Snooze sit in a single 64 pt instrument plate: seven day dots for repeat, an engraved two-position notch for the holiday rule, and a quarter-arc gauge you can drag for snooze. Tapping a cell opens its own sheet. No title rows, no dropdowns. |
+| The home screen is an alarms list. A Tomorrow section holds `Skip`, `+10 min`, and `Restore`, which act on tomorrow only. Each row shows the alarm's time, its label, its repeat summary, today and tomorrow's effective state, and a system toggle. | The wake time is a large tabular readout above the system hour-and-minute wheel. Repeat opens a list of presets and weekdays. Holiday Rule is a picker. Snooze is a picker of the existing intervals and is saved immediately. |
 
 | 3. Calendar | 4. Sources |
 | :---: | :---: |
 | <img src="docs/screenshots/03-calendar.png" width="88%" alt="Calendar"> | <img src="docs/screenshots/04-sources.png" width="88%" alt="Sources"> |
-| A month grid marks each day in the same engraved language: an amber dot for a public holiday, a ring for a makeup workday, a dash for personal leave. Tap a day to filter the entries below; add, edit or delete any entry. | Holiday feeds, each with a toggle, plus `Add Country` into the searchable catalog, a custom `.ics` URL, and a refresh. iOS Calendar access is read-only with one toggle per calendar. Everything that is on or off is a plain toggle, never a dial. |
+| A month grid marks each day by shape: a dot for a public holiday, a ring for a makeup workday, a bar for personal leave. Tap a day to filter the entries below; add, edit or delete any entry. | Holiday feeds, each with a toggle, plus `Add Country` into the searchable catalog, a custom `.ics` URL, and a refresh. iOS Calendar access is read-only with one toggle per calendar. |
 
 | 5. Widgets | 6. Add Holidays |
 | :---: | :---: |
@@ -45,17 +45,14 @@ Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`
 | 7. Parse Notice | 2b. Repeat Sheet |
 | :---: | :---: |
 | <img src="docs/screenshots/07-parse-notice.png" width="88%" alt="Parse Notice"> | <img src="docs/screenshots/02b-repeat-sheet.png" width="88%" alt="Repeat sheet"> |
-| Paste a leave notice or an HR email. The on-device parser (or your own API key, if you set one) turns it into dated entries — personal leave, public holiday, makeup workday — before anything is saved. | The repeat sheet: four presets on top and every weekday below with checkmarks, so a custom pattern is one or two taps. |
+| Paste a leave notice or an HR email. The on-device parser (or your own API key, if you set one) turns it into dated entries — personal leave, public holiday, makeup workday — before anything is saved. | The repeat sheet: four presets and every weekday with checkmarks, so a custom pattern is one or two taps. Once uses a date picker. |
 
 ---
 
 ## Core Features
 
 1. **Alarms list with next-day quick keys** — `Skip`, `+10 min` and `Restore` apply to tomorrow only and clear themselves the day after.
-2. **Skeuomorphic controls used sparingly and consistently** (`iOS/Shared`):
-   - `MachinedDisc` — the large engraved disc used for the hour and the minute.
-   - `WakeOptionsInstrumentRow` — one 64 pt recessed plate split into three instrument cells: Repeat (seven day dots), Holiday (a two-position engraved notch) and Snooze (a quarter-arc gauge you can drag). Tapping a cell opens a medium-height sheet; every cell is a VoiceOver adjustable control.
-   - `CompactRoller` — a horizontal rotary control, now used only for the snooze interval in Settings.
+2. **System controls.** `TabView`, inset grouped lists, `DatePicker` wheel, `Picker`, `Toggle`, and `Button`. Repeat remains a VoiceOver adjustable row. The time uses monospaced digits and scales with Dynamic Type.
 3. **Three-source holiday engine, all on device**:
    - External `.ics` subscriptions, including China's statutory holidays and makeup workdays, Singapore MOM, and a searchable catalog of 54 national feeds. Google feeds are classified so observances and regional-only days do not silently skip a workday.
    - Read-only `EventKit` scanning of chosen calendars against leave keywords.
@@ -69,7 +66,7 @@ Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`
 
 - **`VibeAlarmCore`** — a dependency-free Swift package: scheduling engine, models, `.ics` parser, holiday catalog, BYOK service, shared store. Unit tested.
 - **`iOS/App`** — the SwiftUI app: `AlarmListView`, `TimeEditorView`, `HolidayCalendarView`, `SettingsView`, `HolidayCatalogSearchSheet`, `BYOKInputSheet`.
-- **`iOS/Shared`** — controls, widget views, App Intents for Siri and Shortcuts, and the notification scheduler.
+- **`iOS/Shared`** — widget views, App Intents for Siri and Shortcuts, and the notification scheduler.
 - **`iOS/Widget`** — the WidgetKit extension with small and medium widgets.
 
 ## Build & Test

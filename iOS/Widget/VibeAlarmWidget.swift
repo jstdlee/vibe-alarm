@@ -1,5 +1,6 @@
 import AppIntents
 import SwiftUI
+import UIKit
 import VibeAlarmCore
 import WidgetKit
 
@@ -66,7 +67,7 @@ struct VibeAlarmWidgetEntryView: View {
             }
         }
         .containerBackground(for: .widget) {
-            VibePalette.paper
+            Color(.systemBackground)
         }
     }
 }

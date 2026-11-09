@@ -25,7 +25,6 @@ struct VibeAlarmApp: App {
     var body: some Scene {
         WindowGroup {
             rootView
-                .preferredColorScheme(.light)
                 .task {
                     notificationDelegate.viewModel = viewModel
                     if previewScreen == nil {
@@ -74,19 +73,27 @@ enum MainAppTab: Hashable, CaseIterable {
 
     var title: String {
         switch self {
-        case .alarms: return "ALARMS"
-        case .calendar: return "CALENDAR"
-        case .sources: return "SOURCES"
+        case .alarms: return "Alarms"
+        case .calendar: return "Calendar"
+        case .sources: return "Sources"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .alarms: return "alarm"
+        case .calendar: return "calendar"
+        case .sources: return "list.bullet"
         }
     }
 }
 
-/// Three paper tabs and an amber index that slides under the active one. The bar is drawn, not a
-/// system material, so it belongs to the same machined surface as everything else.
+/// System tab bar. On iOS 26 and later the bar adopts Liquid Glass when this target is built
+/// with the current SDK. The deployment target stays iOS 17, so this view uses `TabView`
+/// rather than a newer glass API.
 struct MainTabView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var selectedTab: MainAppTab
-    @Namespace private var indexNamespace
 
     init(viewModel: AppViewModel, initialTab: MainAppTab = .alarms) {
         self.viewModel = viewModel
@@ -94,71 +101,19 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch selectedTab {
-                case .alarms:
-                    AlarmListView(viewModel: viewModel)
-                case .calendar:
-                    HolidayCalendarView(viewModel: viewModel)
-                case .sources:
-                    SettingsView(viewModel: viewModel)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        TabView(selection: $selectedTab) {
+            AlarmListView(viewModel: viewModel)
+                .tabItem { Label(MainAppTab.alarms.title, systemImage: MainAppTab.alarms.symbolName) }
+                .tag(MainAppTab.alarms)
 
-            tabBar
-        }
-        .background(VibePalette.paper.ignoresSafeArea())
-        .preferredColorScheme(.light)
-    }
+            HolidayCalendarView(viewModel: viewModel)
+                .tabItem { Label(MainAppTab.calendar.title, systemImage: MainAppTab.calendar.symbolName) }
+                .tag(MainAppTab.calendar)
 
-    private var tabBar: some View {
-        VStack(spacing: 0) {
-            Hairline()
-            HStack(spacing: 0) {
-                ForEach(MainAppTab.allCases, id: \.self) { tab in
-                    tabKey(tab)
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 14)
-            .padding(.bottom, 6)
+            SettingsView(viewModel: viewModel)
+                .tabItem { Label(MainAppTab.sources.title, systemImage: MainAppTab.sources.symbolName) }
+                .tag(MainAppTab.sources)
         }
-        .background(VibePalette.paper.opacity(0.97))
-    }
-
-    private func tabKey(_ tab: MainAppTab) -> some View {
-        let isSelected = tab == selectedTab
-        return Button {
-            guard !isSelected else { return }
-            UISelectionFeedbackGenerator().selectionChanged()
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
-                selectedTab = tab
-            }
-        } label: {
-            VStack(spacing: 7) {
-                Text(tab.title)
-                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                    .tracking(1.9)
-                    .foregroundStyle(isSelected ? VibePalette.ink : VibePalette.inkFaint)
-                Group {
-                    if isSelected {
-                        Capsule()
-                            .fill(VibePalette.amber)
-                            .frame(width: 18, height: 2.4)
-                            .matchedGeometryEffect(id: "tab-index", in: indexNamespace)
-                    } else {
-                        Color.clear.frame(width: 18, height: 2.4)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(tab.title.capitalized)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
