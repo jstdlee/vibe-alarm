@@ -6,13 +6,13 @@
 ![iOS 17.0+](https://img.shields.io/badge/iOS-17.0%2B-E8E2D8?logo=apple&logoColor=black)
 ![SwiftUI](https://img.shields.io/badge/Swift-SwiftUI%20%C2%B7%20WidgetKit-B4622D?logo=swift)
 
-> **Design language: machined matte volumes.** A warm plaster paper ground, matte discs that sit in a recessed well and cast one soft shadow from a single light source, engraved hairline grooves, and exactly one accent — a warm amber used for the active index and the single primary action. Depth comes from shadow and well, never from borders or glass. Motion is weighted: a dial turns like a heavy object.
+> **Two appearances, one alarm.** Standard is the default: system lists, a wheel for the time, and the iPhone light, dark, and contrast settings. Bedside Clock is the alternate: a large time, hour and minute drums, and warm paper or a charcoal case. Choose Appearance at the top of Sources. The choice is stored on this iPhone and applies immediately, including the Home Screen widgets.
 
 ---
 
 ## iOS Simulator Screenshots
 
-Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`, in light appearance. Every screen is also captured on a 375 x 667 phone (`docs/screenshots/small/`).
+The pictures below are the previous interface. Current captures are produced by GitHub Actions for both Appearance settings, in light mode, on the primary simulator and on a 375 x 667 phone. They are uploaded with the unsigned IPA under `dist/screenshots/standard`, `dist/screenshots/bedside`, and the matching `screenshots-small` folders.
 
 <p align="center">
   <img src="docs/screenshots/01-alarms.png" width="19%" alt="Alarms">
@@ -52,10 +52,7 @@ Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`
 ## Core Features
 
 1. **Alarms list with next-day quick keys** — `Skip`, `+10 min` and `Restore` apply to tomorrow only and clear themselves the day after.
-2. **Skeuomorphic controls used sparingly and consistently** (`iOS/Shared`):
-   - `MachinedDisc` — the large engraved disc used for the hour and the minute.
-   - `WakeOptionsInstrumentRow` — one 64 pt recessed plate split into three instrument cells: Repeat (seven day dots), Holiday (a two-position engraved notch) and Snooze (a quarter-arc gauge you can drag). Tapping a cell opens a medium-height sheet; every cell is a VoiceOver adjustable control.
-   - `CompactRoller` — a horizontal rotary control, now used only for the snooze interval in Settings.
+2. **Appearance** — Standard uses system controls and a wheel for the wake time. Bedside Clock uses a large time, drums for the hour and minute, and a paper or charcoal surface. Sources → Appearance stores the choice in the App Group.
 3. **Three-source holiday engine, all on device**:
    - External `.ics` subscriptions, including China's statutory holidays and makeup workdays, Singapore MOM, and a searchable catalog of 54 national feeds. Google feeds are classified so observances and regional-only days do not silently skip a workday.
    - Read-only `EventKit` scanning of chosen calendars against leave keywords.
@@ -69,7 +66,7 @@ Captured by GitHub Actions on `macos-26` against a real build of `VibeAlarm.app`
 
 - **`VibeAlarmCore`** — a dependency-free Swift package: scheduling engine, models, `.ics` parser, holiday catalog, BYOK service, shared store. Unit tested.
 - **`iOS/App`** — the SwiftUI app: `AlarmListView`, `TimeEditorView`, `HolidayCalendarView`, `SettingsView`, `HolidayCatalogSearchSheet`, `BYOKInputSheet`.
-- **`iOS/Shared`** — controls, widget views, App Intents for Siri and Shortcuts, and the notification scheduler.
+- **`iOS/Shared`** — appearance tokens, widget views, App Intents for Siri and Shortcuts, and the notification scheduler.
 - **`iOS/Widget`** — the WidgetKit extension with small and medium widgets.
 
 ## Build & Test

@@ -22,7 +22,7 @@ concurrency:
 jobs:
   ios:
     runs-on: macos-26-intel
-    timeout-minutes: 95
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +60,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO | xcbeautify
 
       - name: Capture iOS Simulator screenshots (light theme)
-        timeout-minutes: 22
+        timeout-minutes: 45
         run: |
           set -euo pipefail
           APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
@@ -70,7 +70,7 @@ jobs:
       - name: Capture small phone screenshots (375 x 667)
         # A layout check, not a release gate: it must never stall the run.
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 50
         run: |
           set -euo pipefail
           APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
@@ -106,8 +106,8 @@ jobs:
           path: |
             dist/VibeAlarm.ipa
             dist/VibeAlarm.ipa.sha256
-            dist/screenshots/*.png
-            dist/screenshots-small/*.png
+            dist/screenshots/**/*.png
+            dist/screenshots-small/**/*.png
             dist/screenshots/crashes/*
             dist/screenshots-small/crashes/*
             dist/crashes/*

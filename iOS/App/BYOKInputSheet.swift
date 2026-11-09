@@ -3,9 +3,6 @@ import VibeAlarmCore
 
 /// Paste an HR notice, a leave email or a link to an `.ics` feed and turn it into calendar entries,
 /// either with the on-device rules or through the user's own key.
-///
-/// The paste area is a recessed well, the ways to read it are two milled keys, and the results are
-/// a plain list of engraved lines. Nothing is boxed.
 public struct BYOKInputSheet: View {
     @ObservedObject var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
@@ -28,162 +25,88 @@ public struct BYOKInputSheet: View {
 
     public var body: some View {
         NavigationStack {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("PASTE")
-                        .vibeCaption()
-                        .padding(.top, 8)
-
+            Form {
+                Section {
                     TextEditor(text: $inputText)
-                        .font(.system(size: 14))
-                        .foregroundStyle(VibePalette.ink)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 132)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .recessedWell(corner: 14)
-                        .overlay(alignment: .topLeading) {
-                            if inputText.isEmpty {
-                                Text("A holiday notice, a leave email, or a link to an .ics feed.")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(VibePalette.inkFaint)
-                                    .padding(.horizontal, 17)
-                                    .padding(.vertical, 18)
-                                    .allowsHitTesting(false)
-                            }
-                        }
-                        .padding(.top, 8)
+                        .frame(minHeight: 140)
+                        .accessibilityLabel("Notice")
+                } header: {
+                    Text("Paste")
+                } footer: {
+                    Text("A holiday notice, a leave email, or a link to an .ics feed.")
+                }
 
-                    HStack(spacing: 12) {
-                        actionKey(title: "READ ON DEVICE", enabled: !isExtracting) {
-                            errorMessage = nil
-                            extractionResult = service.parseLocally(text: inputText)
-                        }
-                        actionKey(
-                            title: isExtracting ? "READING" : "READ WITH KEY",
-                            enabled: !isExtracting
-                        ) {
-                            Task { await runBYOKLLMParse() }
-                        }
+                Section {
+                    Button("Read on Device") {
+                        errorMessage = nil
+                        extractionResult = service.parseLocally(text: inputText)
                     }
-                    .padding(.top, 16)
+                    .disabled(isExtracting)
 
-                    if let errorMessage {
+                    Button(isExtracting ? "Reading" : "Read with Key") {
+                        Task { await runBYOKLLMParse() }
+                    }
+                    .disabled(isExtracting)
+                }
+
+                if let errorMessage {
+                    Section {
                         Text(errorMessage)
-                            .font(.system(size: 11.5))
-                            .lineSpacing(2)
-                            .foregroundStyle(VibePalette.inkFaint)
-                            .padding(.top, 12)
-                    }
-
-                    if let result = extractionResult {
-                        results(result)
-                            .padding(.top, 28)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
+
+                if let result = extractionResult {
+                    results(result)
+                }
             }
-            .background(VibePalette.paper.ignoresSafeArea())
             .navigationTitle("Parse Notice")
+            .vibeChrome()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(VibePalette.inkSoft)
                 }
             }
         }
-        .tint(VibePalette.amber)
     }
 
-    private func actionKey(title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(1.3)
-                .foregroundStyle(VibePalette.ink.opacity(enabled ? 1 : 0.4))
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .machinedPlate(corner: 15, raised: enabled)
-        }
-        .buttonStyle(KeyPressStyle())
-        .disabled(!enabled)
-    }
-
-    // MARK: - Results
-
+    @ViewBuilder
     private func results(_ result: BYOKExtractionResult) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("FOUND")
-                    .vibeCaption(VibePalette.inkSoft)
-                Spacer()
-                Text("\(result.entries.count)")
-                    .font(.system(size: 11, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(VibePalette.inkFaint)
-            }
-            .padding(.bottom, 10)
-
-            Hairline()
-
+        Section {
             ForEach(result.entries) { entry in
-                VStack(spacing: 0) {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(entry.title)
-                                .font(.system(size: 15))
-                                .foregroundStyle(VibePalette.ink)
-                            Text(entry.date)
-                                .font(.system(size: 11.5, design: .monospaced))
-                                .foregroundStyle(VibePalette.inkFaint)
-                        }
-                        Spacer(minLength: 8)
-                        Text(entry.kind.displayTitle.uppercased())
-                            .vibeCaption(VibePalette.inkFaint)
-                    }
-                    .padding(.vertical, 13)
-                    Hairline()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.title)
+                    Text(entry.date)
+                        .font(.subheadline.monospaced())
+                        .foregroundStyle(.secondary)
+                    Text(entry.kind.displayTitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
 
             ForEach(result.discoveredCalendarURLs, id: \.self) { url in
-                VStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Calendar feed found")
-                            .font(.system(size: 15))
-                            .foregroundStyle(VibePalette.ink)
-                        Text(url)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(VibePalette.inkFaint)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 13)
-                    Hairline()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Calendar feed found")
+                    Text(url)
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
             }
+        } header: {
+            Text("Found \(result.entries.count)")
+        }
 
-            Button {
+        Section {
+            Button("Add to Calendar") {
                 viewModel.mergeExtractedEntries(result.entries, discoveredURLs: result.discoveredCalendarURLs)
                 dismiss()
-            } label: {
-                Text("ADD TO CALENDAR")
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .tracking(1.4)
-                    .foregroundStyle(VibePalette.amber)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .machinedPlate(corner: 15)
             }
-            .buttonStyle(KeyPressStyle())
             .disabled(result.entries.isEmpty && result.discoveredCalendarURLs.isEmpty)
-            .padding(.top, 22)
         }
     }
-
-    // MARK: - Parsing
 
     private func runBYOKLLMParse() async {
         errorMessage = nil

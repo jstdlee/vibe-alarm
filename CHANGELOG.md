@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add an Appearance setting with Standard (default) and Bedside Clock. Both follow the system light, dark, and contrast settings. The choice is stored in the App Group and the widgets use it.
+
 ## v0.2.0
 
 - **Braun / Apple Industrial Light Aesthetic**: Redesigned the entire interface in a crisp Apple + Dieter Rams light theme (`#F5F5F7` alabaster canvas, `#FFFFFF` cards, precision `#ECECEF` anodized dials, and `#FF5500` International Orange accents).
