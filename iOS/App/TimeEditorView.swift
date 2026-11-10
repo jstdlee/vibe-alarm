@@ -159,42 +159,49 @@ public struct TimeEditorView: View {
         }
     }
 
-    /// Cancel and Save sit on the paper. The name and the option plate stay up
-    /// top. The hour and minute discs fill the bottom, with their lower halves
-    /// off the screen.
+    /// Cancel and Save sit on the paper. The name and the wake options stay
+    /// with them. The hour and minute discs fill whatever height is left, with
+    /// their lower halves off the bottom edge.
     private var bedsideBody: some View {
         GeometryReader { proxy in
             let isCompact = proxy.size.height < 720
-            let discDiameter = min(proxy.size.width * (isCompact ? 0.86 : 0.98), isCompact ? 322 : 400)
             VStack(spacing: 0) {
                 bedsideTitle(isCompact: isCompact)
 
-                BedsideInstrumentRow(
+                BedsideWakeOptions(
                     repeatMode: repeatMode,
                     onceDate: onceDate,
                     holidaySmart: holidaySmart,
                     snoozeMinutes: viewModel.snoozeMinutes,
                     accent: BedsideDialColor.accent(scheme: colorScheme, contrast: contrast),
-                    onOpen: { activeSheet = $0 },
+                    onOpenRepeat: { activeSheet = .repeatDays },
                     onCycleRepeat: { step in
                         selectRepeatIndex((repeatIndex + step + 5) % 5)
                     },
                     onHolidayChange: { holidaySmart = $0 },
                     onSnoozeChange: { viewModel.setSnoozeMinutes($0) }
                 )
-                .padding(.horizontal, 24)
-                .padding(.top, isCompact ? 14 : 26)
+                .padding(.horizontal, 20)
+                .padding(.top, isCompact ? 4 : 8)
 
-                Spacer(minLength: 0)
-
-                BedsideDiscPair(
-                    diameter: discDiameter,
-                    hour: hour,
-                    minute: minute,
-                    onHourChange: { hour = $0 },
-                    onMinuteChange: { minute = $0 }
-                )
-                .padding(.bottom, -(discDiameter * (isCompact ? 0.14 : 0.20)))
+                GeometryReader { discSpace in
+                    // Keep the lower portion off the bottom edge and use the
+                    // rest of the height for the upper arc, so the rims sit
+                    // just under the options.
+                    let clip: CGFloat = 0.32
+                    let diameter = discSpace.size.height / (1 - clip)
+                    BedsideDiscPair(
+                        diameter: diameter,
+                        hour: hour,
+                        minute: minute,
+                        onHourChange: { hour = $0 },
+                        onMinuteChange: { minute = $0 }
+                    )
+                    .padding(.bottom, -(diameter * clip))
+                    .frame(width: discSpace.size.width, height: discSpace.size.height, alignment: .top)
+                }
+                .padding(.top, isCompact ? 8 : 12)
+                .frame(minHeight: isCompact ? 220 : 300)
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
         }
@@ -230,14 +237,14 @@ public struct TimeEditorView: View {
                 .tracking(1.6)
                 .foregroundStyle(tokens.inkFaint)
             Text(alarmLabel)
-                .font(.system(size: isCompact ? 28 : 34, weight: .regular))
+                .font(.system(size: isCompact ? 26 : 30, weight: .regular))
                 .foregroundStyle(tokens.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
-        .padding(.top, isCompact ? 44 : 54)
+        .padding(.horizontal, 20)
+        .padding(.top, isCompact ? 48 : 52)
         .accessibilityElement(children: .combine)
     }
 

@@ -2,52 +2,31 @@ import SwiftUI
 import UIKit
 import VibeAlarmCore
 
-/// Repeat, holiday, and snooze on one plate above the bedside discs.
+/// Repeat, holiday, and snooze for the bedside wake editor.
 ///
-/// Tapping a cell opens its sheet. Swiping with VoiceOver changes the value
-/// without opening the sheet. The snooze arc can also be dragged.
-struct BedsideInstrumentRow: View {
+/// Each control is a full-width plate. Repeat opens the repeat sheet. Holiday
+/// is a switch. Snooze is a row of minute choices. Nothing is squeezed into
+/// a shared three-cell strip.
+struct BedsideWakeOptions: View {
     let repeatMode: AlarmRepeatMode
     let onceDate: Date
     let holidaySmart: Bool
     let snoozeMinutes: Int
     let accent: Color
-    let onOpen: (WakeOptionSheet) -> Void
+    let onOpenRepeat: () -> Void
     let onCycleRepeat: (Int) -> Void
     let onHolidayChange: (Bool) -> Void
     let onSnoozeChange: (Int) -> Void
 
     @Environment(\.vibeTokens) private var tokens
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var measuredHeight: CGFloat = 64
-
-    private var rowHeight: CGFloat { min(max(measuredHeight, 64), 88) }
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        HStack(spacing: 0) {
-            repeatCell
-            groove
-            holidayCell
-            groove
-            snoozeCell
+        VStack(spacing: 10) {
+            repeatRow
+            holidayRow
+            snoozeRow
         }
-        .frame(height: rowHeight)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(tokens.well.shadow(.inner(color: Color.black.opacity(0.16), radius: 4, y: 2)))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(tokens.hairline, lineWidth: 0.6)
-                )
-        }
-    }
-
-    private var groove: some View {
-        Rectangle()
-            .fill(tokens.hairline)
-            .frame(width: 0.6)
-            .padding(.vertical, 12)
-            .accessibilityHidden(true)
     }
 
     private var activeDays: Set<Weekday> {
@@ -60,226 +39,185 @@ struct BedsideInstrumentRow: View {
         }
     }
 
-    private var onceHint: String {
-        onceDate.formatted(.dateTime.month(.abbreviated).day())
+    private var repeatValue: String {
+        if case .specificDates = repeatMode {
+            let day = onceDate.formatted(.dateTime.month(.abbreviated).day())
+            return "Once, \(day)"
+        }
+        return AlarmFormatting.repeatTitle(repeatMode)
     }
 
-    private var repeatCell: some View {
-        cell(caption: "REPEAT", value: AlarmFormatting.repeatTitle(repeatMode)) {
-            if case .specificDates = repeatMode {
-                HStack(spacing: 5) {
-                    Circle().fill(accent).frame(width: 5, height: 5)
-                    Text(onceHint)
-                        .font(.system(size: 10, weight: .medium).monospacedDigit())
-                        .foregroundStyle(tokens.inkSoft)
-                }
-            } else {
-                HStack(spacing: 4) {
-                    ForEach(AlarmFormatting.weekOrder, id: \.self) { day in
-                        Circle()
-                            .fill(activeDays.contains(day) ? accent : tokens.paper)
-                            .overlay(Circle().strokeBorder(tokens.hairline, lineWidth: 0.5))
-                            .frame(width: 5, height: 5)
+    private var repeatRow: some View {
+        Button(action: onOpenRepeat) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    caption("REPEAT")
+                    Text(repeatValue)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(tokens.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    if case .specificDates = repeatMode {
+                        EmptyView()
+                    } else {
+                        HStack(spacing: 5) {
+                            ForEach(AlarmFormatting.weekOrder, id: \.self) { day in
+                                Circle()
+                                    .fill(activeDays.contains(day) ? accent : tokens.paper)
+                                    .overlay(Circle().strokeBorder(tokens.hairline, lineWidth: 0.6))
+                                    .frame(width: 7, height: 7)
+                            }
+                        }
+                        .accessibilityHidden(true)
                     }
                 }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(tokens.inkFaint)
             }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .onTapGesture { onOpen(.repeatDays) }
-        .accessibilityElement(children: .ignore)
+        .buttonStyle(.plain)
+        .background { plate }
         .accessibilityLabel("Repeat")
         .accessibilityValue(repeatAccessibilityValue)
         .accessibilityHint("Opens repeat options. Swipe up or down to change.")
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction { onOpen(.repeatDays) }
         .accessibilityAdjustableAction { direction in
             onCycleRepeat(direction == .increment ? 1 : -1)
         }
     }
 
     private var repeatAccessibilityValue: String {
-        if case .specificDates = repeatMode { return "Once, \(onceHint)" }
+        if case .specificDates = repeatMode {
+            return "Once, \(onceDate.formatted(.dateTime.month(.wide).day()))"
+        }
         if case .customDays(let days) = repeatMode {
-            return days.sorted().map(\.shortWeekdayName).joined(separator: ", ")
+            let names = days.sorted().map(\.shortWeekdayName).joined(separator: ", ")
+            return names.isEmpty ? "No days" : names
         }
         return AlarmFormatting.repeatTitle(repeatMode)
     }
 
-    private var holidayCell: some View {
-        cell(caption: "HOLIDAY", value: holidaySmart ? "Smart skip" : "Always ring") {
-            BedsideHolidayNotch(smart: holidaySmart, accent: accent, reduceMotion: reduceMotion)
-        }
-        .onTapGesture { onOpen(.holiday) }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Holiday rule")
-        .accessibilityValue(holidaySmart ? "Smart skip on public holidays" : "Always ring")
-        .accessibilityHint("Opens holiday options. Swipe up or down to change.")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { onOpen(.holiday) }
-        .accessibilityAdjustableAction { _ in onHolidayChange(!holidaySmart) }
-    }
-
-    private var snoozeIndex: Int {
-        AlarmRule.snoozeIntervalOptions.firstIndex(of: snoozeMinutes) ?? 0
-    }
-
-    private var snoozeCell: some View {
-        HStack(alignment: .center, spacing: 6) {
+    private var holidayRow: some View {
+        HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("SNOOZE")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.2)
-                    .foregroundStyle(tokens.inkFaint)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text("\(snoozeMinutes) min")
-                    .font(.system(size: 14, weight: .medium).monospacedDigit())
+                caption("HOLIDAY")
+                Text(holidaySmart ? "Smart skip" : "Always ring")
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(tokens.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                Text(holidaySmart
+                     ? "Quiet on holidays and leave days. Rings on makeup workdays."
+                     : "Rings on every scheduled day, holidays included.")
+                    .font(.subheadline)
+                    .foregroundStyle(tokens.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
             }
-            Spacer(minLength: 0)
-            BedsideSnoozeGauge(
-                index: snoozeIndex,
-                count: AlarmRule.snoozeIntervalOptions.count,
-                accent: accent,
-                reduceMotion: reduceMotion
-            ) { index in
-                onSnoozeChange(AlarmRule.snoozeIntervalOptions[index])
+            Spacer(minLength: 8)
+            Toggle(isOn: Binding(
+                get: { holidaySmart },
+                set: { newValue in
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    onHolidayChange(newValue)
+                }
+            )) {
+                Text("Smart skip")
             }
-            .frame(width: 34, height: 34)
+            .labelsHidden()
+            .tint(accent)
+            .accessibilityLabel("Smart skip")
+            .accessibilityValue(holidaySmart ? "On" : "Off")
+            .accessibilityHint(holidaySmart
+                               ? "Quiet on holidays and leave days. Rings on makeup workdays."
+                               : "Rings on every scheduled day, holidays included.")
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .onTapGesture { onOpen(.snooze) }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Snooze interval")
-        .accessibilityValue("\(snoozeMinutes) minutes")
-        .accessibilityHint("Opens snooze options. Swipe up or down to change.")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { onOpen(.snooze) }
-        .accessibilityAdjustableAction { direction in
-            let options = AlarmRule.snoozeIntervalOptions
-            let next = min(max(snoozeIndex + (direction == .increment ? 1 : -1), 0), options.count - 1)
-            onSnoozeChange(options[next])
-        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+        .background { plate }
+        .accessibilityElement(children: .contain)
     }
 
-    private func cell<G: View>(caption: String, value: String, @ViewBuilder glyph: () -> G) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(caption)
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.2)
-                .foregroundStyle(tokens.inkFaint)
+    private var snoozeChoices: [Int] {
+        var options = AlarmRule.snoozeIntervalOptions
+        if !options.contains(snoozeMinutes) {
+            options.append(snoozeMinutes)
+            options.sort()
+        }
+        return options
+    }
+
+    private var snoozeRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                caption("SNOOZE")
+                Spacer(minLength: 8)
+                Text("\(snoozeMinutes) min")
+                    .font(.body.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(tokens.ink)
+            }
+            HStack(spacing: 6) {
+                ForEach(snoozeChoices, id: \.self) { minutes in
+                    snoozeKey(minutes)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { plate }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func snoozeKey(_ minutes: Int) -> some View {
+        let selected = minutes == snoozeMinutes
+        return Button {
+            guard minutes != snoozeMinutes else { return }
+            UISelectionFeedbackGenerator().selectionChanged()
+            onSnoozeChange(minutes)
+        } label: {
+            Text("\(minutes)")
+                .font(.body.weight(.semibold).monospacedDigit())
+                .foregroundStyle(selected ? selectedInk : tokens.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text(value)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(tokens.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            glyph().frame(height: 8)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(selected ? accent : tokens.paper)
+                }
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-    }
-}
-
-private struct BedsideHolidayNotch: View {
-    let smart: Bool
-    let accent: Color
-    let reduceMotion: Bool
-
-    @Environment(\.vibeTokens) private var tokens
-
-    var body: some View {
-        ZStack(alignment: smart ? .leading : .trailing) {
-            Capsule()
-                .fill(tokens.paper.shadow(.inner(color: Color.black.opacity(0.22), radius: 1.2, y: 1)))
-            Capsule()
-                .fill(smart ? accent : tokens.raised)
-                .frame(width: 12, height: 6)
-                .padding(.horizontal, 1)
-        }
-        .frame(width: 26, height: 8)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: smart)
-    }
-}
-
-private struct BedsideSnoozeGauge: View {
-    let index: Int
-    let count: Int
-    let accent: Color
-    let reduceMotion: Bool
-    let onChange: (Int) -> Void
-
-    @Environment(\.vibeTokens) private var tokens
-
-    private func angle(for step: Int) -> Angle {
-        .degrees(-90 + Double(step) * 90 / Double(max(count - 1, 1)))
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(minutes) minutes")
+        .accessibilityAddTraits(selected ? .isSelected : AccessibilityTraits())
     }
 
-    var body: some View {
-        GeometryReader { geo in
-            let size = min(geo.size.width, geo.size.height)
-            let pivot = CGPoint(x: 2, y: size - 2)
-            let radius = size - 5
-            ZStack {
-                Path { path in
-                    path.addArc(
-                        center: pivot,
-                        radius: radius,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(0),
-                        clockwise: false
-                    )
-                }
-                .stroke(tokens.hairline, lineWidth: 0.8)
-                ForEach(0..<count, id: \.self) { step in
-                    let radians = angle(for: step).radians
-                    Path { path in
-                        path.move(to: CGPoint(
-                            x: pivot.x + cos(radians) * (radius - 4),
-                            y: pivot.y + sin(radians) * (radius - 4)
-                        ))
-                        path.addLine(to: CGPoint(
-                            x: pivot.x + cos(radians) * (radius + 2),
-                            y: pivot.y + sin(radians) * (radius + 2)
-                        ))
-                    }
-                    .stroke(step == index ? accent : tokens.inkFaint, lineWidth: step == index ? 1.6 : 0.9)
-                }
-                let radians = angle(for: index).radians
-                Path { path in
-                    path.move(to: pivot)
-                    path.addLine(to: CGPoint(
-                        x: pivot.x + cos(radians) * (radius - 6),
-                        y: pivot.y + sin(radians) * (radius - 6)
-                    ))
-                }
-                .stroke(accent, style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                Circle()
-                    .fill(tokens.ink)
-                    .frame(width: 4, height: 4)
-                    .position(pivot)
-            }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: index)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 2)
-                    .onChanged { gesture in
-                        let dx = max(gesture.location.x - pivot.x, 0.001)
-                        let dy = min(gesture.location.y - pivot.y, 0)
-                        let degrees = atan2(dy, dx) * 180 / .pi
-                        let unit = (degrees + 90) / 90
-                        let next = min(max(Int((unit * Double(count - 1)).rounded()), 0), count - 1)
-                        if next != index {
-                            UISelectionFeedbackGenerator().selectionChanged()
-                            onChange(next)
-                        }
-                    }
+    private var selectedInk: Color {
+        scheme == .dark
+            ? Color(red: 0.16, green: 0.12, blue: 0.07)
+            : Color.white
+    }
+
+    private func caption(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(1.3)
+            .foregroundStyle(tokens.inkFaint)
+            .lineLimit(1)
+    }
+
+    private var plate: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(tokens.raised)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(tokens.hairline, lineWidth: 0.6)
             )
-        }
+            .shadow(color: Color.black.opacity(scheme == .dark ? 0.28 : 0.05), radius: 8, y: 3)
     }
 }

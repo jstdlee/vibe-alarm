@@ -12,10 +12,7 @@ enum BedsidePlateMetrics {
     static let tickOuter: CGFloat = 0.792
     static let tickInnerMinor: CGFloat = 0.758
     static let tickInnerMajor: CGFloat = 0.722
-    static let numeralRadius: CGFloat = 0.64
-    static let wellRadiusFraction: CGFloat = 0.40
-    /// Diameter of the reading well, as a fraction of the disc radius.
-    static let wellDiameterOverRadius: CGFloat = 0.36
+    static let numeralRadius: CGFloat = 0.70
 }
 
 enum BedsideDialColor {
@@ -44,6 +41,8 @@ struct BedsideDisc: View {
     let diameter: CGFloat
     /// Direction of the reading well. 0 is three o'clock; negative is above the horizontal.
     let wellAngleDegrees: Double
+    /// Distance of the well centre from the disc centre, as a fraction of the radius.
+    let wellRadiusFraction: CGFloat
     let value: Int
     let onChange: (Int) -> Void
 
@@ -63,6 +62,7 @@ struct BedsideDisc: View {
         unitLabel: String,
         diameter: CGFloat,
         wellAngleDegrees: Double,
+        wellRadiusFraction: CGFloat,
         onChange: @escaping (Int) -> Void
     ) {
         self.value = value
@@ -71,6 +71,7 @@ struct BedsideDisc: View {
         self.unitLabel = unitLabel
         self.diameter = diameter
         self.wellAngleDegrees = wellAngleDegrees
+        self.wellRadiusFraction = wellRadiusFraction
         self.onChange = onChange
         _dragStartValue = State(initialValue: value)
     }
@@ -197,7 +198,7 @@ struct BedsideDisc: View {
     // MARK: - Reading well
 
     private var wellSize: CGFloat {
-        radius * BedsidePlateMetrics.wellDiameterOverRadius
+        min(radius * 0.30, 72)
     }
 
     private var readWell: some View {
@@ -208,7 +209,7 @@ struct BedsideDisc: View {
                 .fill(accent.opacity(contrast == .increased ? 0.9 : 0.55))
                 .frame(width: 1.1, height: radius * 0.12)
                 .rotationEffect(.degrees(wellAngleDegrees + 90))
-                .position(point(rad: rad, r: radius * (BedsidePlateMetrics.wellRadiusFraction + 0.16)))
+                .position(point(rad: rad, r: radius * (wellRadiusFraction + 0.14)))
 
             VStack(spacing: 0) {
                 Text(String(format: "%02d", value))
@@ -243,7 +244,7 @@ struct BedsideDisc: View {
                         )
                     )
             }
-            .position(point(rad: rad, r: radius * BedsidePlateMetrics.wellRadiusFraction))
+            .position(point(rad: rad, r: radius * wellRadiusFraction))
         }
         .allowsHitTesting(false)
     }
@@ -336,11 +337,12 @@ struct BedsideDisc: View {
 
 /// Hour disc on the left, minute disc on the right.
 ///
-/// Each disc is about as wide as the phone. Its centre sits near the bezel, so
-/// the near half runs off the screen and the upper half is what a thumb turns.
+/// The discs are wider than the phone. Each centre sits past the bezel, so the
+/// lower half runs off the bottom and the upper half fills the space under the
+/// wake options. Reading wells stay on the visible inner face.
 struct BedsideDiscPair: View {
     let diameter: CGFloat
-    var gap: CGFloat = 22
+    var gap: CGFloat = 16
     let hour: Int
     let minute: Int
     let onHourChange: (Int) -> Void
@@ -348,8 +350,11 @@ struct BedsideDiscPair: View {
 
     var body: some View {
         GeometryReader { geo in
+            let radius = diameter / 2
             let cap = max(1, (geo.size.width - gap) / 2)
-            let centreInset = cap - diameter / 2
+            let centreInset = cap - radius
+            let left = wellPlacement(centerX: centreInset, targetX: geo.size.width * 0.27, radius: radius)
+            let right = wellPlacement(centerX: geo.size.width - centreInset, targetX: geo.size.width * 0.73, radius: radius)
             ZStack(alignment: .topLeading) {
                 BedsideDisc(
                     value: hour,
@@ -357,7 +362,8 @@ struct BedsideDiscPair: View {
                     majorStep: 1,
                     unitLabel: "Hour",
                     diameter: diameter,
-                    wellAngleDegrees: -22,
+                    wellAngleDegrees: left.angle,
+                    wellRadiusFraction: left.fraction,
                     onChange: onHourChange
                 )
                 .position(x: centreInset, y: diameter / 2)
@@ -368,7 +374,8 @@ struct BedsideDiscPair: View {
                     majorStep: 5,
                     unitLabel: "Min",
                     diameter: diameter,
-                    wellAngleDegrees: -158,
+                    wellAngleDegrees: right.angle,
+                    wellRadiusFraction: right.fraction,
                     onChange: onMinuteChange
                 )
                 .position(x: geo.size.width - centreInset, y: diameter / 2)
@@ -376,5 +383,15 @@ struct BedsideDiscPair: View {
             .frame(width: geo.size.width, height: diameter, alignment: .topLeading)
         }
         .frame(height: diameter)
+    }
+
+    /// Aims the well at a point on the visible face, then keeps it inside the numeral ring.
+    private func wellPlacement(centerX: CGFloat, targetX: CGFloat, radius: CGFloat) -> (angle: Double, fraction: CGFloat) {
+        let dx = targetX - centerX
+        let dy = -radius * 0.20
+        let angle = atan2(Double(dy), Double(dx)) * 180 / .pi
+        let needed = hypot(dx, dy) / max(radius, 1)
+        let fraction = min(0.50, max(0.36, needed))
+        return (angle, fraction)
     }
 }
