@@ -125,6 +125,48 @@ final class VibeAlarmCoreTests: XCTestCase {
         XCTAssertTrue(tomorrowKept.hasManualOverride)
     }
 
+    func testNeitherSkipFlagRingsOnHolidayAndPersonalLeave() throws {
+        let rule = AlarmRule(
+            hour: 7,
+            minute: 30,
+            repeatMode: .weekdays,
+            skipPublicHolidays: false,
+            skipPersonalLeave: false
+        )
+        let entries = [
+            HolidayCalendarEntry(date: "2026-10-27", title: "Annual Leave", kind: .personalLeave, source: .localEventKit),
+            HolidayCalendarEntry(date: "2026-10-28", title: "Public Holiday", kind: .publicHoliday, source: .builtin)
+        ]
+        let monday = try XCTUnwrap(engine.date(from: "2026-10-26"))
+        let days = engine.resolveSchedule(
+            rule: rule,
+            entries: entries,
+            override: nil,
+            referenceDate: monday,
+            daysCount: 3
+        )
+        XCTAssertEqual(days[1].date, "2026-10-27")
+        XCTAssertEqual(days[1].status, .scheduled)
+        XCTAssertEqual(days[1].effectiveTime, "07:30")
+        XCTAssertEqual(days[2].date, "2026-10-28")
+        XCTAssertEqual(days[2].status, .scheduled)
+        XCTAssertEqual(days[2].effectiveTime, "07:30")
+    }
+
+    func testWeeklySelectionUsesTheNamedRepeatCases() {
+        XCTAssertEqual(AlarmRepeatMode.matching(weekdays: Weekday.standardWeekdays), .weekdays)
+        XCTAssertEqual(AlarmRepeatMode.matching(weekdays: Set(Weekday.allCases)), .everyday)
+        XCTAssertEqual(AlarmRepeatMode.matching(weekdays: [.saturday, .sunday]), .weekends)
+        XCTAssertEqual(
+            AlarmRepeatMode.matching(weekdays: [.monday, .wednesday]),
+            .customDays([.monday, .wednesday])
+        )
+        XCTAssertEqual(AlarmRepeatMode.matching(weekdays: []), .customDays([]))
+        XCTAssertEqual(AlarmRepeatMode.weekdays.weekdays, Weekday.standardWeekdays)
+        XCTAssertEqual(AlarmRepeatMode.everyday.weekdays, Set(Weekday.allCases))
+        XCTAssertTrue(AlarmRepeatMode.specificDates(["2026-11-09"]).weekdays.isEmpty)
+    }
+
     func testWeekendsRepeatModeOnlyRingsOnSaturdayAndSunday() throws {
         let rule = AlarmRule(hour: 9, minute: 0, repeatMode: .weekends, skipPublicHolidays: true)
         // 2026-10-26 is a Monday

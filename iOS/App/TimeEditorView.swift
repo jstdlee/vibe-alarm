@@ -16,7 +16,8 @@ public struct TimeEditorView: View {
     @State private var hour: Int
     @State private var minute: Int
     @State private var repeatMode: AlarmRepeatMode
-    @State private var holidaySmart: Bool
+    @State private var skipPublicHolidays: Bool
+    @State private var skipPersonalLeave: Bool
     @State private var customDaysSelection: Set<Weekday>
     @State private var onceDate: Date
 
@@ -40,7 +41,8 @@ public struct TimeEditorView: View {
         _hour = State(initialValue: rule.hour)
         _minute = State(initialValue: rule.minute)
         _repeatMode = State(initialValue: rule.repeatMode)
-        _holidaySmart = State(initialValue: rule.skipPublicHolidays)
+        _skipPublicHolidays = State(initialValue: rule.skipPublicHolidays)
+        _skipPersonalLeave = State(initialValue: rule.skipPersonalLeave)
 
         if case .customDays(let days) = rule.repeatMode, !days.isEmpty {
             _customDaysSelection = State(initialValue: days)
@@ -115,17 +117,13 @@ public struct TimeEditorView: View {
                     .accessibilityAdjustableAction { direction in
                         selectRepeatIndex((repeatIndex + (direction == .increment ? 1 : -1) + 5) % 5)
                     }
+                }
 
-                    Picker("Holiday Rule", selection: $holidaySmart) {
-                        Text("Smart skip").tag(true)
-                        Text("Always ring").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityHint("Swipe up or down to change.")
+                Section {
+                    Toggle("Public holidays", isOn: $skipPublicHolidays)
+                    Toggle("Personal leave", isOn: $skipPersonalLeave)
                 } footer: {
-                    Text(holidaySmart
-                         ? "Stays quiet on public holidays and leave days, and rings on makeup workdays."
-                         : "Rings on every scheduled day, holidays included.")
+                    Text(standardSkipFooter)
                 }
 
                 Section {
@@ -169,19 +167,17 @@ public struct TimeEditorView: View {
                 bedsideTitle(isCompact: isCompact)
 
                 BedsideWakeOptions(
-                    repeatMode: repeatMode,
-                    onceDate: onceDate,
-                    holidaySmart: holidaySmart,
+                    weekdays: repeatMode.weekdays,
+                    skipPublicHolidays: skipPublicHolidays,
+                    skipPersonalLeave: skipPersonalLeave,
                     snoozeMinutes: viewModel.snoozeMinutes,
                     accent: BedsideDialColor.accent(scheme: colorScheme, contrast: contrast),
-                    onOpenRepeat: { activeSheet = .repeatDays },
-                    onCycleRepeat: { step in
-                        selectRepeatIndex((repeatIndex + step + 5) % 5)
-                    },
-                    onHolidayChange: { holidaySmart = $0 },
+                    onWeekdaysChange: { repeatMode = AlarmRepeatMode.matching(weekdays: $0) },
+                    onSkipPublicHolidays: { skipPublicHolidays = $0 },
+                    onSkipPersonalLeave: { skipPersonalLeave = $0 },
                     onSnoozeChange: { viewModel.setSnoozeMinutes($0) }
                 )
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.top, isCompact ? 4 : 8)
 
                 GeometryReader { discSpace in
@@ -254,7 +250,7 @@ public struct TimeEditorView: View {
         case .repeatDays:
             RepeatOptionSheet(repeatMode: $repeatMode, customDays: $customDaysSelection, onceDate: $onceDate)
         case .holiday:
-            HolidayOptionSheet(smart: $holidaySmart)
+            HolidayOptionSheet(smart: $skipPublicHolidays)
         case .snooze:
             SnoozeOptionSheet(minutes: viewModel.snoozeMinutes) { viewModel.setSnoozeMinutes($0) }
         }
@@ -283,6 +279,19 @@ public struct TimeEditorView: View {
             options.sort()
         }
         return options
+    }
+
+    private var standardSkipFooter: String {
+        switch (skipPublicHolidays, skipPersonalLeave) {
+        case (false, false):
+            return "Rings on every scheduled day."
+        case (true, false):
+            return "Stays quiet on public holidays and rings on makeup workdays."
+        case (false, true):
+            return "Stays quiet on personal leave."
+        case (true, true):
+            return "Stays quiet on public holidays and personal leave, and rings on makeup workdays."
+        }
     }
 
     private var snoozeSelection: Binding<Int> {
@@ -328,7 +337,8 @@ public struct TimeEditorView: View {
             rule.hour = hour
             rule.minute = minute
             rule.repeatMode = repeatMode
-            rule.skipPublicHolidays = holidaySmart
+            rule.skipPublicHolidays = skipPublicHolidays
+            rule.skipPersonalLeave = skipPersonalLeave
         }
         dismiss()
     }
