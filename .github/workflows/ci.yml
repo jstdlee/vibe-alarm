@@ -22,7 +22,7 @@ concurrency:
 jobs:
   ios:
     runs-on: macos-26-intel
-    timeout-minutes: 95
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +60,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO | xcbeautify
 
       - name: Capture iOS Simulator screenshots (light theme)
-        timeout-minutes: 22
+        timeout-minutes: 45
         run: |
           set -euo pipefail
           APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
@@ -70,12 +70,12 @@ jobs:
       - name: Capture small phone screenshots (375 x 667)
         # A layout check, not a release gate: it must never stall the run.
         continue-on-error: true
-        timeout-minutes: 18
+        timeout-minutes: 28
         run: |
           set -euo pipefail
           APP_PATH=$(find build/sim/Build/Products -name "VibeAlarm.app" | head -1)
           echo "Installing $APP_PATH on $SIM_SMALL"
-          scripts/capture-screenshots.sh "$SIM_SMALL" "$APP_PATH" "dist/screenshots-small"
+          CAPTURE_DARK=0 scripts/capture-screenshots.sh "$SIM_SMALL" "$APP_PATH" "dist/screenshots-small"
 
       - name: Collect crash reports
         if: always()
@@ -89,6 +89,9 @@ jobs:
         timeout-minutes: 30
         run: |
           set -o pipefail
+          # The screenshot simulators are finished. Shut them down so the device
+          # build is not competing with a stuck simulator for the rest of the job.
+          xcrun simctl shutdown all || true
           xcodebuild build -project VibeAlarm.xcodeproj -scheme VibeAlarm -configuration Release \
             -destination 'generic/platform=iOS' -derivedDataPath build/device \
             CODE_SIGNING_ALLOWED=NO | xcbeautify
@@ -106,8 +109,8 @@ jobs:
           path: |
             dist/VibeAlarm.ipa
             dist/VibeAlarm.ipa.sha256
-            dist/screenshots/*.png
-            dist/screenshots-small/*.png
+            dist/screenshots/**/*.png
+            dist/screenshots-small/**/*.png
             dist/screenshots/crashes/*
             dist/screenshots-small/crashes/*
             dist/crashes/*

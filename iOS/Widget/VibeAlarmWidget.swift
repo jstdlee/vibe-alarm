@@ -1,5 +1,6 @@
 import AppIntents
 import SwiftUI
+import UIKit
 import VibeAlarmCore
 import WidgetKit
 
@@ -55,8 +56,15 @@ struct VibeAlarmTimelineProvider: TimelineProvider {
 struct VibeAlarmWidgetEntryView: View {
     var entry: VibeAlarmWidgetEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    private var style: AppearanceStyle {
+        AppearanceStyle.load(from: UserDefaults(suiteName: AppConstants.appGroupID))
+    }
 
     var body: some View {
+        let tokens = VibeTokens.resolve(style: style, scheme: scheme, contrast: contrast)
         Group {
             switch family {
             case .systemSmall:
@@ -65,8 +73,10 @@ struct VibeAlarmWidgetEntryView: View {
                 MediumWidgetContentView(today: entry.today, tomorrow: entry.tomorrow)
             }
         }
+        .environment(\.appearanceStyle, style)
+        .environment(\.vibeTokens, tokens)
         .containerBackground(for: .widget) {
-            VibePalette.paper
+            tokens.paper
         }
     }
 }
