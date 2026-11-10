@@ -62,6 +62,39 @@ public enum AlarmRepeatMode: Codable, Equatable, Hashable, Sendable {
     /// Specific calendar dates in `YYYY-MM-DD` format.
     case specificDates(Set<String>)
 
+    /// The weekdays this mode rings on, before holiday and leave rules.
+    /// A one-off date alarm has no weekly days.
+    public var weekdays: Set<Weekday> {
+        switch self {
+        case .weekdays:
+            return Weekday.standardWeekdays
+        case .everyday:
+            return Set(Weekday.allCases)
+        case .weekends:
+            return [.saturday, .sunday]
+        case .customDays(let days):
+            return days
+        case .specificDates:
+            return []
+        }
+    }
+
+    /// Stores a weekly selection in the existing repeat cases.
+    /// Monday to Friday, every day, and weekends keep their named cases so
+    /// makeup workdays and the rest of the scheduler stay unchanged.
+    public static func matching(weekdays: Set<Weekday>) -> AlarmRepeatMode {
+        if weekdays == Weekday.standardWeekdays {
+            return .weekdays
+        }
+        if weekdays == Set(Weekday.allCases) {
+            return .everyday
+        }
+        if weekdays == [.saturday, .sunday] {
+            return .weekends
+        }
+        return .customDays(weekdays)
+    }
+
     public var summaryText: String {
         switch self {
         case .weekdays:

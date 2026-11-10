@@ -2,146 +2,180 @@ import SwiftUI
 import UIKit
 import VibeAlarmCore
 
-/// Repeat, holiday, and snooze for the bedside wake editor.
+/// Repeat, skip, and snooze for the bedside wake editor.
 ///
-/// Each control is a full-width plate. Repeat opens the repeat sheet. Holiday
-/// is a switch. Snooze is a row of minute choices. Nothing is squeezed into
-/// a shared three-cell strip.
+/// Repeat is seven day keys. A tap toggles one day. A drag paints days on or
+/// off: the first key touched chooses the direction, and every key the finger
+/// crosses takes that state. Skip is two independent keys. Snooze is the
+/// minute choices. There are no helper sentences.
 struct BedsideWakeOptions: View {
-    let repeatMode: AlarmRepeatMode
-    let onceDate: Date
-    let holidaySmart: Bool
+    let weekdays: Set<Weekday>
+    let skipPublicHolidays: Bool
+    let skipPersonalLeave: Bool
     let snoozeMinutes: Int
     let accent: Color
-    let onOpenRepeat: () -> Void
-    let onCycleRepeat: (Int) -> Void
-    let onHolidayChange: (Bool) -> Void
+    let onWeekdaysChange: (Set<Weekday>) -> Void
+    let onSkipPublicHolidays: (Bool) -> Void
+    let onSkipPersonalLeave: (Bool) -> Void
     let onSnoozeChange: (Int) -> Void
 
     @Environment(\.vibeTokens) private var tokens
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var paintTurningOn: Bool?
+    @State private var lastPaintIndex: Int?
+
+    private let daySpacing: CGFloat = 3
 
     var body: some View {
         VStack(spacing: 10) {
             repeatRow
-            holidayRow
+            skipRow
             snoozeRow
         }
     }
 
-    private var activeDays: Set<Weekday> {
-        switch repeatMode {
-        case .weekdays: return Weekday.standardWeekdays
-        case .everyday: return Set(Weekday.allCases)
-        case .weekends: return [.saturday, .sunday]
-        case .customDays(let days): return days
-        case .specificDates: return []
-        }
-    }
-
-    private var repeatValue: String {
-        if case .specificDates = repeatMode {
-            let day = onceDate.formatted(.dateTime.month(.abbreviated).day())
-            return "Once, \(day)"
-        }
-        return AlarmFormatting.repeatTitle(repeatMode)
-    }
+    // MARK: - Repeat
 
     private var repeatRow: some View {
-        Button(action: onOpenRepeat) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    caption("REPEAT")
-                    Text(repeatValue)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(tokens.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    if case .specificDates = repeatMode {
-                        EmptyView()
-                    } else {
-                        HStack(spacing: 5) {
-                            ForEach(AlarmFormatting.weekOrder, id: \.self) { day in
-                                Circle()
-                                    .fill(activeDays.contains(day) ? accent : tokens.paper)
-                                    .overlay(Circle().strokeBorder(tokens.hairline, lineWidth: 0.6))
-                                    .frame(width: 7, height: 7)
-                            }
-                        }
-                        .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 8) {
+            label("Repeat")
+            GeometryReader { geo in
+                HStack(spacing: daySpacing) {
+                    ForEach(AlarmFormatting.weekOrder, id: \.self) { day in
+                        dayKey(day)
                     }
                 }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(tokens.inkFaint)
+                .contentShape(Rectangle())
+                .gesture(dayPaint(width: geo.size.width))
             }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-            .contentShape(Rectangle())
+            .frame(height: 44)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { plate }
+    }
+
+    private func dayKey(_ day: Weekday) -> some View {
+        let on = weekdays.contains(day)
+        return Text(day.shortWeekdayName)
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .foregroundStyle(on ? selectedInk : tokens.ink)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(on ? accent : tokens.paper)
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: on)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(day.shortWeekdayName)
+            .accessibilityValue(on ? "On" : "Off")
+            .accessibilityAddTraits(on ? [.isToggle, .isSelected] : .isToggle)
+            .accessibilityAction { toggle(day) }
+    }
+
+    private func dayPaint(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let index = dayIndex(at: value.location.x, width: width)
+                paint(through: index)
+            }
+            .onEnded { _ in
+                paintTurningOn = nil
+                lastPaintIndex = nil
+            }
+    }
+
+    private func dayIndex(at x: CGFloat, width: CGFloat) -> Int {
+        let count = AlarmFormatting.weekOrder.count
+        let slot = (width + daySpacing) / CGFloat(count)
+        guard slot > 0 else { return 0 }
+        return min(count - 1, max(0, Int(x / slot)))
+    }
+
+    private func paint(through index: Int) {
+        let order = AlarmFormatting.weekOrder
+        if paintTurningOn == nil {
+            paintTurningOn = !weekdays.contains(order[index])
+        }
+        guard let turningOn = paintTurningOn else { return }
+        let start = lastPaintIndex ?? index
+        var days = weekdays
+        var changed = false
+        for cursor in min(start, index)...max(start, index) {
+            let day = order[cursor]
+            if turningOn, !days.contains(day) {
+                days.insert(day)
+                changed = true
+            } else if !turningOn, days.contains(day) {
+                days.remove(day)
+                changed = true
+            }
+        }
+        lastPaintIndex = index
+        guard changed else { return }
+        UISelectionFeedbackGenerator().selectionChanged()
+        onWeekdaysChange(days)
+    }
+
+    private func toggle(_ day: Weekday) {
+        var days = weekdays
+        if days.contains(day) {
+            days.remove(day)
+        } else {
+            days.insert(day)
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+        onWeekdaysChange(days)
+    }
+
+    // MARK: - Skip
+
+    private var skipRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            label("Skip")
+            HStack(spacing: 8) {
+                skipKey("Public holidays", on: skipPublicHolidays) { next in
+                    onSkipPublicHolidays(next)
+                }
+                skipKey("Personal leave", on: skipPersonalLeave) { next in
+                    onSkipPersonalLeave(next)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background { plate }
+    }
+
+    private func skipKey(_ title: String, on: Bool, set: @escaping (Bool) -> Void) -> some View {
+        Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            set(!on)
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(on ? selectedInk : tokens.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(on ? accent : tokens.paper)
+                }
         }
         .buttonStyle(.plain)
-        .background { plate }
-        .accessibilityLabel("Repeat")
-        .accessibilityValue(repeatAccessibilityValue)
-        .accessibilityHint("Opens repeat options. Swipe up or down to change.")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAdjustableAction { direction in
-            onCycleRepeat(direction == .increment ? 1 : -1)
-        }
+        .accessibilityLabel(title)
+        .accessibilityValue(on ? "On" : "Off")
+        .accessibilityAddTraits(on ? [.isToggle, .isSelected] : .isToggle)
     }
 
-    private var repeatAccessibilityValue: String {
-        if case .specificDates = repeatMode {
-            return "Once, \(onceDate.formatted(.dateTime.month(.wide).day()))"
-        }
-        if case .customDays(let days) = repeatMode {
-            let names = days.sorted().map(\.shortWeekdayName).joined(separator: ", ")
-            return names.isEmpty ? "No days" : names
-        }
-        return AlarmFormatting.repeatTitle(repeatMode)
-    }
-
-    private var holidayRow: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                caption("HOLIDAY")
-                Text(holidaySmart ? "Smart skip" : "Always ring")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(tokens.ink)
-                    .lineLimit(1)
-                Text(holidaySmart
-                     ? "Quiet on holidays and leave days. Rings on makeup workdays."
-                     : "Rings on every scheduled day, holidays included.")
-                    .font(.subheadline)
-                    .foregroundStyle(tokens.inkSoft)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 8)
-            Toggle(isOn: Binding(
-                get: { holidaySmart },
-                set: { newValue in
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    onHolidayChange(newValue)
-                }
-            )) {
-                Text("Smart skip")
-            }
-            .labelsHidden()
-            .tint(accent)
-            .accessibilityLabel("Smart skip")
-            .accessibilityValue(holidaySmart ? "On" : "Off")
-            .accessibilityHint(holidaySmart
-                               ? "Quiet on holidays and leave days. Rings on makeup workdays."
-                               : "Rings on every scheduled day, holidays included.")
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-        .background { plate }
-        .accessibilityElement(children: .contain)
-    }
+    // MARK: - Snooze
 
     private var snoozeChoices: [Int] {
         var options = AlarmRule.snoozeIntervalOptions
@@ -153,13 +187,14 @@ struct BedsideWakeOptions: View {
     }
 
     private var snoozeRow: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                caption("SNOOZE")
+                label("Snooze")
                 Spacer(minLength: 8)
                 Text("\(snoozeMinutes) min")
                     .font(.body.weight(.semibold).monospacedDigit())
                     .foregroundStyle(tokens.ink)
+                    .accessibilityHidden(true)
             }
             HStack(spacing: 6) {
                 ForEach(snoozeChoices, id: \.self) { minutes in
@@ -167,7 +202,7 @@ struct BedsideWakeOptions: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { plate }
@@ -194,7 +229,7 @@ struct BedsideWakeOptions: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(minutes) minutes")
-        .accessibilityAddTraits(selected ? .isSelected : AccessibilityTraits())
+        .accessibilityAddTraits(selected ? [.isToggle, .isSelected] : .isToggle)
     }
 
     private var selectedInk: Color {
@@ -203,12 +238,12 @@ struct BedsideWakeOptions: View {
             : Color.white
     }
 
-    private func caption(_ text: String) -> some View {
+    private func label(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(1.3)
-            .foregroundStyle(tokens.inkFaint)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(tokens.inkSoft)
             .lineLimit(1)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private var plate: some View {
