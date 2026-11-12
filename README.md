@@ -12,40 +12,91 @@
 
 ## iOS Simulator Screenshots
 
-The pictures below are the previous interface. Current captures are produced by GitHub Actions for both Appearance settings, in light mode, on the primary simulator and on a 375 x 667 phone. They are uploaded with the unsigned IPA under `dist/screenshots/standard`, `dist/screenshots/bedside`, and the matching `screenshots-small` folders.
+These captures come from GitHub Actions ([run 42829876435](https://github.com/jstdlee/vibe-alarm/actions/runs/42829876435)), one set for Standard and one for Bedside Clock. Light mode is the default. The wake time editor is also captured in dark mode. The same screens on a 375 × 667 phone are in `docs/screenshots/small/standard` and `docs/screenshots/small/bedside`.
+
+### Standard
 
 <p align="center">
-  <img src="docs/screenshots/01-alarms.png" width="19%" alt="Alarms">
-  <img src="docs/screenshots/02-wake-time-editor.png" width="19%" alt="Wake Time">
-  <img src="docs/screenshots/03-calendar.png" width="19%" alt="Calendar">
-  <img src="docs/screenshots/04-sources.png" width="19%" alt="Sources">
-  <img src="docs/screenshots/05-widgets.png" width="19%" alt="Widgets">
+  <img src="docs/screenshots/standard/01-alarms.png" width="19%" alt="Alarms">
+  <img src="docs/screenshots/standard/02-wake-time-editor.png" width="19%" alt="Wake time editor, light">
+  <img src="docs/screenshots/standard/02-wake-time-editor-dark.png" width="19%" alt="Wake time editor, dark">
+  <img src="docs/screenshots/standard/02b-repeat-sheet.png" width="19%" alt="Repeat sheet">
+  <img src="docs/screenshots/standard/03-calendar.png" width="19%" alt="Calendar">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/06-holiday-catalog.png" width="19%" alt="Add Holidays">
-  <img src="docs/screenshots/07-parse-notice.png" width="19%" alt="Parse Notice">
+  <img src="docs/screenshots/standard/04-sources.png" width="19%" alt="Sources">
+  <img src="docs/screenshots/standard/05-widgets.png" width="19%" alt="Widgets">
+  <img src="docs/screenshots/standard/06-holiday-catalog.png" width="19%" alt="Holiday catalog">
+  <img src="docs/screenshots/standard/07-parse-notice.png" width="19%" alt="Parse notice">
 </p>
 
-| 1. Alarms | 2. Wake Time |
+| Alarms | Wake time editor, light |
 | :---: | :---: |
-| <img src="docs/screenshots/01-alarms.png" width="88%" alt="Alarms list"> | <img src="docs/screenshots/02-wake-time-editor.png" width="88%" alt="Wake time editor"> |
-| The home screen is an alarms list. Above it sit three machined quick keys — `Skip`, `+10 min`, `Restore` — that act on tomorrow only. Each row shows the alarm's large time, its repeat summary, today and tomorrow's effective state, and a real toggle. | Two large engraved discs fill the lower half for the hour and the minute, sized for a thumb on each edge. Repeat, Holiday Rule and Snooze sit in a single 64 pt instrument plate: seven day dots for repeat, an engraved two-position notch for the holiday rule, and a quarter-arc gauge you can drag for snooze. Tapping a cell opens its own sheet. No title rows, no dropdowns. |
+| <img src="docs/screenshots/standard/01-alarms.png" width="88%" alt="Standard alarms"> | <img src="docs/screenshots/standard/02-wake-time-editor.png" width="88%" alt="Standard wake time editor, light"> |
+| A grouped list. Tomorrow shows the date and why it will or will not ring. `Skip`, `+10 min`, and `Restore` act on tomorrow only. Each alarm row has its time, repeat summary, today and tomorrow, and a toggle. | The system wheel sets the time. Repeat opens its sheet. Public holidays and Personal leave are separate switches. Snooze is a segmented control. |
 
-| 3. Calendar | 4. Sources |
+| Wake time editor, dark | Repeat sheet |
 | :---: | :---: |
-| <img src="docs/screenshots/03-calendar.png" width="88%" alt="Calendar"> | <img src="docs/screenshots/04-sources.png" width="88%" alt="Sources"> |
-| A month grid marks each day in the same engraved language: an amber dot for a public holiday, a ring for a makeup workday, a dash for personal leave. Tap a day to filter the entries below; add, edit or delete any entry. | Holiday feeds, each with a toggle, plus `Add Country` into the searchable catalog, a custom `.ics` URL, and a refresh. iOS Calendar access is read-only with one toggle per calendar. Everything that is on or off is a plain toggle, never a dial. |
+| <img src="docs/screenshots/standard/02-wake-time-editor-dark.png" width="88%" alt="Standard wake time editor, dark"> | <img src="docs/screenshots/standard/02b-repeat-sheet.png" width="88%" alt="Standard repeat sheet"> |
+| The same editor in dark mode: wheel, repeat row, the two skip switches, and snooze. | Presets on top (Weekdays, Every Day, Weekends, Once) and each weekday below, with checkmarks. |
 
-| 5. Widgets | 6. Add Holidays |
+| Calendar | Sources |
 | :---: | :---: |
-| <img src="docs/screenshots/05-widgets.png" width="88%" alt="Widgets"> | <img src="docs/screenshots/06-holiday-catalog.png" width="88%" alt="Add Holidays"> |
-| Small and medium Home Screen widgets built from the same shared views, with interactive `Skip`, `+10 min` and `Restore` buttons. A bedtime notification previews tomorrow with the same one-tap actions. | A catalog of 54 national public holiday feeds. Search by country name or code and tap `Add`; the feed becomes an ordinary `.ics` subscription. |
+| <img src="docs/screenshots/standard/03-calendar.png" width="88%" alt="Standard calendar"> | <img src="docs/screenshots/standard/04-sources.png" width="88%" alt="Standard sources"> |
+| A month grid. Tap a day to filter the entries below. Add, edit, or delete any entry. | Appearance chooses Standard or Bedside Clock. Holiday feeds each have a toggle, plus Add Country and a custom `.ics` URL. iOS Calendar access is read-only, one toggle per calendar. |
 
-| 7. Parse Notice | 2b. Repeat Sheet |
+| Widgets | Holiday catalog |
 | :---: | :---: |
-| <img src="docs/screenshots/07-parse-notice.png" width="88%" alt="Parse Notice"> | <img src="docs/screenshots/02b-repeat-sheet.png" width="88%" alt="Repeat sheet"> |
-| Paste a leave notice or an HR email. The on-device parser (or your own API key, if you set one) turns it into dated entries — personal leave, public holiday, makeup workday — before anything is saved. | The repeat sheet: four presets on top and every weekday below with checkmarks, so a custom pattern is one or two taps. |
+| <img src="docs/screenshots/standard/05-widgets.png" width="88%" alt="Standard widgets"> | <img src="docs/screenshots/standard/06-holiday-catalog.png" width="88%" alt="Standard holiday catalog"> |
+| Small and medium Home Screen widgets with `Skip`, `+10 min`, and `Restore`. | A catalog of 54 national public holiday feeds. Search by country name or code and tap Add. |
+
+<p align="center">
+  <img src="docs/screenshots/standard/07-parse-notice.png" width="32%" alt="Standard parse notice"><br>
+  Paste a leave notice or an HR email. The on-device parser, or your own API key, turns it into dated entries before anything is saved.
+</p>
+
+### Bedside Clock
+
+<p align="center">
+  <img src="docs/screenshots/bedside/01-alarms.png" width="19%" alt="Bedside alarms">
+  <img src="docs/screenshots/bedside/02-wake-time-editor.png" width="19%" alt="Bedside wake time editor, light">
+  <img src="docs/screenshots/bedside/02-wake-time-editor-dark.png" width="19%" alt="Bedside wake time editor, dark">
+  <img src="docs/screenshots/bedside/02b-repeat-sheet.png" width="19%" alt="Bedside repeat sheet">
+  <img src="docs/screenshots/bedside/03-calendar.png" width="19%" alt="Bedside calendar">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/bedside/04-sources.png" width="19%" alt="Bedside sources">
+  <img src="docs/screenshots/bedside/05-widgets.png" width="19%" alt="Bedside widgets">
+  <img src="docs/screenshots/bedside/06-holiday-catalog.png" width="19%" alt="Bedside holiday catalog">
+  <img src="docs/screenshots/bedside/07-parse-notice.png" width="19%" alt="Bedside parse notice">
+</p>
+
+| Alarms | Wake time editor, light |
+| :---: | :---: |
+| <img src="docs/screenshots/bedside/01-alarms.png" width="88%" alt="Bedside alarms"> | <img src="docs/screenshots/bedside/02-wake-time-editor.png" width="88%" alt="Bedside wake time editor, light"> |
+| Warm paper, a large tomorrow status, and the same three tomorrow keys. Alarm rows keep the time, label, repeat summary, and toggle. | Monday through Sunday are day keys. Skip offers Public holidays and Personal leave. Snooze is a row of minute keys. Two half-discs set the hour and the minute. |
+
+| Wake time editor, dark | Repeat sheet |
+| :---: | :---: |
+| <img src="docs/screenshots/bedside/02-wake-time-editor-dark.png" width="88%" alt="Bedside wake time editor, dark"> | <img src="docs/screenshots/bedside/02b-repeat-sheet.png" width="88%" alt="Bedside repeat sheet"> |
+| Charcoal faces and antique brass rings. The day keys, skip keys, and snooze keys use the same layout in dark mode. | The repeat sheet over the bedside editor: Weekdays, Every Day, Weekends, Once, then each weekday. |
+
+| Calendar | Sources |
+| :---: | :---: |
+| <img src="docs/screenshots/bedside/03-calendar.png" width="88%" alt="Bedside calendar"> | <img src="docs/screenshots/bedside/04-sources.png" width="88%" alt="Bedside sources"> |
+| The same month grid and entry list, on the bedside paper. | Appearance is at the top. Bedside Clock is selected. Holiday feeds, Add Country, and a custom URL follow. |
+
+| Widgets | Holiday catalog |
+| :---: | :---: |
+| <img src="docs/screenshots/bedside/05-widgets.png" width="88%" alt="Bedside widgets"> | <img src="docs/screenshots/bedside/06-holiday-catalog.png" width="88%" alt="Bedside holiday catalog"> |
+| The same small and medium widgets, tinted for Bedside Clock. | The same 54-country catalog, on the bedside surface. |
+
+<p align="center">
+  <img src="docs/screenshots/bedside/07-parse-notice.png" width="32%" alt="Bedside parse notice"><br>
+  Paste a notice. The parser still turns it into personal leave, a public holiday, or a makeup workday before anything is saved.
+</p>
 
 ---
 
