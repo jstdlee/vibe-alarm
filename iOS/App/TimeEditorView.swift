@@ -23,8 +23,6 @@ public struct TimeEditorView: View {
 
     @Environment(\.appearanceStyle) private var appearanceStyle
     @Environment(\.vibeTokens) private var tokens
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.colorSchemeContrast) private var contrast
     @State private var activeSheet: WakeOptionSheet?
     @ScaledMetric(relativeTo: .largeTitle) private var timeSize: CGFloat = 56
 
@@ -163,6 +161,7 @@ public struct TimeEditorView: View {
     private var bedsideBody: some View {
         GeometryReader { proxy in
             let isCompact = proxy.size.height < 720
+            let discDiameter = min(proxy.size.width * 0.92, isCompact ? 300 : 360)
             VStack(spacing: 0) {
                 bedsideTitle(isCompact: isCompact)
 
@@ -171,7 +170,7 @@ public struct TimeEditorView: View {
                     skipPublicHolidays: skipPublicHolidays,
                     skipPersonalLeave: skipPersonalLeave,
                     snoozeMinutes: viewModel.snoozeMinutes,
-                    accent: BedsideDialColor.accent(scheme: colorScheme, contrast: contrast),
+                    accent: tokens.accent,
                     onWeekdaysChange: { repeatMode = AlarmRepeatMode.matching(weekdays: $0) },
                     onSkipPublicHolidays: { skipPublicHolidays = $0 },
                     onSkipPersonalLeave: { skipPersonalLeave = $0 },
@@ -180,24 +179,16 @@ public struct TimeEditorView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, isCompact ? 4 : 8)
 
-                GeometryReader { discSpace in
-                    // Keep the lower portion off the bottom edge and use the
-                    // rest of the height for the upper arc, so the rims sit
-                    // just under the options.
-                    let clip: CGFloat = 0.32
-                    let diameter = discSpace.size.height / (1 - clip)
-                    BedsideDiscPair(
-                        diameter: diameter,
-                        hour: hour,
-                        minute: minute,
-                        onHourChange: { hour = $0 },
-                        onMinuteChange: { minute = $0 }
-                    )
-                    .padding(.bottom, -(diameter * clip))
-                    .frame(width: discSpace.size.width, height: discSpace.size.height, alignment: .top)
-                }
-                .padding(.top, isCompact ? 8 : 12)
-                .frame(minHeight: isCompact ? 220 : 300)
+                Spacer(minLength: 8)
+
+                BedsideDiscPair(
+                    diameter: discDiameter,
+                    hour: hour,
+                    minute: minute,
+                    onHourChange: { hour = $0 },
+                    onMinuteChange: { minute = $0 }
+                )
+                .padding(.bottom, -(discDiameter * (isCompact ? 0.22 : 0.28)))
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
         }
@@ -219,7 +210,7 @@ public struct TimeEditorView: View {
             Button("Save") { save() }
                 .buttonStyle(.plain)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(BedsideDialColor.accent(scheme: colorScheme, contrast: contrast))
+                .foregroundStyle(tokens.accent)
                 .frame(minHeight: 44)
         }
         .padding(.horizontal, 24)
@@ -229,11 +220,11 @@ public struct TimeEditorView: View {
     private func bedsideTitle(isCompact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("WAKE TIME")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(1.6)
+                .font(.system(size: 11, weight: .medium))
+                .tracking(1.2)
                 .foregroundStyle(tokens.inkFaint)
             Text(alarmLabel)
-                .font(.system(size: isCompact ? 26 : 30, weight: .regular))
+                .font(.system(size: isCompact ? 26 : 28, weight: .semibold))
                 .foregroundStyle(tokens.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

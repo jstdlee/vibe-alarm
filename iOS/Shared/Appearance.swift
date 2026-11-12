@@ -97,56 +97,58 @@ public struct VibeTokens: Equatable {
         func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> UIColor {
             UIColor(red: r, green: g, blue: b, alpha: a)
         }
+        // Direction A, "Refined instrument". Light values match the approved mock.
+        // Dark keeps the same layout on charcoal with brass and amber.
         return VibeTokens(
             paper: paint(
-                light: rgb(0.953, 0.941, 0.918),
-                dark: rgb(0.078, 0.075, 0.067),
+                light: rgb(0.957, 0.941, 0.902),
+                dark: rgb(0.082, 0.075, 0.067),
                 lightHigh: .white,
                 darkHigh: .black
             ),
             raised: paint(
-                light: rgb(0.984, 0.976, 0.965),
-                dark: rgb(0.118, 0.110, 0.102),
+                light: rgb(0.984, 0.973, 0.945),
+                dark: rgb(0.125, 0.114, 0.102),
                 lightHigh: .white,
-                darkHigh: rgb(0.08, 0.08, 0.08)
+                darkHigh: rgb(0.10, 0.10, 0.10)
             ),
             well: paint(
-                light: rgb(0.902, 0.882, 0.847),
-                dark: rgb(0.055, 0.051, 0.047),
-                lightHigh: rgb(0.90, 0.90, 0.90),
-                darkHigh: .black
+                light: rgb(0.937, 0.914, 0.875),
+                dark: rgb(0.176, 0.161, 0.145),
+                lightHigh: rgb(0.92, 0.92, 0.92),
+                darkHigh: rgb(0.16, 0.16, 0.16)
             ),
             ink: paint(
-                light: rgb(0.110, 0.098, 0.086),
+                light: rgb(0.122, 0.106, 0.086),
                 dark: rgb(0.965, 0.945, 0.910),
                 lightHigh: .black,
                 darkHigh: .white
             ),
             inkSoft: paint(
-                light: rgb(0.306, 0.286, 0.259),
-                dark: rgb(0.824, 0.796, 0.749),
-                lightHigh: rgb(0.15, 0.15, 0.15),
-                darkHigh: rgb(0.95, 0.95, 0.95)
+                light: rgb(0.482, 0.447, 0.400),
+                dark: rgb(0.718, 0.682, 0.635),
+                lightHigh: rgb(0.18, 0.18, 0.18),
+                darkHigh: rgb(0.92, 0.92, 0.92)
             ),
             inkFaint: paint(
-                light: rgb(0.369, 0.345, 0.310),
-                dark: rgb(0.718, 0.686, 0.639),
-                lightHigh: rgb(0.22, 0.22, 0.22),
-                darkHigh: rgb(0.90, 0.90, 0.90)
+                light: rgb(0.541, 0.518, 0.478),
+                dark: rgb(0.553, 0.522, 0.478),
+                lightHigh: rgb(0.28, 0.28, 0.28),
+                darkHigh: rgb(0.86, 0.86, 0.86)
             ),
             accent: paint(
-                light: rgb(0.478, 0.294, 0.086),
-                dark: rgb(0.941, 0.761, 0.478),
-                lightHigh: rgb(0.361, 0.220, 0.059),
-                darkHigh: rgb(1.0, 0.906, 0.722)
+                light: rgb(0.541, 0.345, 0.110),
+                dark: rgb(0.878, 0.710, 0.416),
+                lightHigh: rgb(0.40, 0.22, 0.05),
+                darkHigh: rgb(1.0, 0.86, 0.62)
             ),
             hairline: paint(
-                light: rgb(0.110, 0.098, 0.086, 0.16),
-                dark: rgb(0.965, 0.945, 0.910, 0.18),
+                light: rgb(0.122, 0.106, 0.086, 0.12),
+                dark: rgb(0.965, 0.945, 0.910, 0.14),
                 lightHigh: rgb(0, 0, 0, 0.35),
                 darkHigh: rgb(1, 1, 1, 0.40)
             ),
-            timeDesign: .rounded,
+            timeDesign: .default,
             timeWeight: .medium
         )
     }

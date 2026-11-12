@@ -220,7 +220,8 @@ if [ "${CAPTURE_DARK:-1}" = "1" ]; then
   for theme in standard bedside; do
     THEME="$theme"
     OUT_DIR="$BASE_OUT/$theme"
-    echo "Capturing dark editor for $theme"
+    echo "Capturing dark home and editor for $theme"
+    capture_screen "home" "01-alarms-dark"
     capture_screen "editor" "02-wake-time-editor-dark"
   done
   xcrun simctl ui "$UDID" appearance light 2>/dev/null || true

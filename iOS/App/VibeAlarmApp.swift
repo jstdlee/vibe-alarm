@@ -163,14 +163,16 @@ struct MainTabView: View {
                                 selectedTab = tab
                             }
                         } label: {
-                            VStack(spacing: 6) {
+                            VStack(spacing: 3) {
+                                Image(systemName: tab.symbolName)
+                                    .font(.system(size: 20, weight: .regular))
                                 Text(tab.title)
-                                    .font(.subheadline.weight(selected ? .semibold : .regular))
-                                    .foregroundStyle(selected ? tokens.ink : tokens.inkSoft)
+                                    .font(.system(size: 10, weight: .medium))
                                 Capsule()
                                     .fill(selected ? tokens.accent : Color.clear)
-                                    .frame(width: 18, height: 3)
+                                    .frame(width: 28, height: 2)
                             }
+                            .foregroundStyle(selected ? tokens.accent : tokens.inkSoft)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
                             .contentShape(Rectangle())

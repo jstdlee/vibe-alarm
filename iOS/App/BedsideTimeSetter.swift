@@ -9,22 +9,25 @@ import UIKit
 /// the brass ring. The bitmap has no ticks and no numerals.
 enum BedsidePlateMetrics {
     static let ringInner: CGFloat = 0.818
-    static let tickOuter: CGFloat = 0.792
-    static let tickInnerMinor: CGFloat = 0.758
-    static let tickInnerMajor: CGFloat = 0.722
-    static let numeralRadius: CGFloat = 0.70
+    /// Ticks occupy a band outside the numerals. The gap between
+    /// `tickInnerMajor` and `numeralRadius` keeps every tick clear of a
+    /// numeral, including the larger selected digit.
+    static let tickOuter: CGFloat = 0.800
+    static let tickInnerMinor: CGFloat = 0.768
+    static let tickInnerMajor: CGFloat = 0.748
+    static let numeralRadius: CGFloat = 0.60
 }
 
 enum BedsideDialColor {
     static func accent(scheme: ColorScheme, contrast: ColorSchemeContrast) -> Color {
         if scheme == .dark {
             return contrast == .increased
-                ? Color(red: 1.0, green: 0.91, blue: 0.72)
-                : Color(red: 0.93, green: 0.76, blue: 0.48)
+                ? Color(red: 1.0, green: 0.88, blue: 0.62)
+                : Color(red: 0.878, green: 0.710, blue: 0.416)
         }
         return contrast == .increased
-            ? Color(red: 0.52, green: 0.26, blue: 0.06)
-            : Color(red: 0.80, green: 0.46, blue: 0.16)
+            ? Color(red: 0.42, green: 0.22, blue: 0.04)
+            : Color(red: 0.604, green: 0.361, blue: 0.071)
     }
 }
 
@@ -160,8 +163,9 @@ struct BedsideDisc: View {
                 var path = Path()
                 path.move(to: point(rad: rad, r: inner))
                 path.addLine(to: point(rad: rad, r: radius * BedsidePlateMetrics.tickOuter))
-                let color = isMajor ? tickMajor : tickMinor
-                context.stroke(path, with: .color(color), lineWidth: isMajor ? 1.15 : 0.7)
+                let selectedTick = index == value
+                let color = selectedTick ? accent : (isMajor ? tickMajor : tickMinor)
+                context.stroke(path, with: .color(color), lineWidth: selectedTick ? 1.6 : (isMajor ? 1.05 : 0.7))
             }
         }
         .frame(width: diameter, height: diameter)
@@ -174,25 +178,45 @@ struct BedsideDisc: View {
             ForEach(0..<count, id: \.self) { slot in
                 let raw = slot * majorStep
                 let selected = raw == value
-                Text(String(format: "%02d", raw))
-                    .font(.system(size: selected ? size * 1.28 : size, weight: selected ? .semibold : .regular))
-                    .monospacedDigit()
-                    .foregroundStyle(selected ? accent : numeralColor)
-                    .rotationEffect(.degrees(-counterRotation))
-                    .position(
-                        point(
-                            rad: (Double(raw) * stepDegrees - 90.0) * .pi / 180.0,
-                            r: radius * BedsidePlateMetrics.numeralRadius
-                        )
-                    )
+                let glyph = selected ? size * selectedNumeralScale : size
+                let center = point(
+                    rad: (Double(raw) * stepDegrees - 90.0) * .pi / 180.0,
+                    r: radius * BedsidePlateMetrics.numeralRadius
+                )
+                ZStack {
+                    if selected {
+                        // Face-colored mask, inside the tick band, so a tick
+                        // cannot draw through the highlighted numeral.
+                        Circle()
+                            .fill(dialFace)
+                            .frame(width: glyph * 1.35, height: glyph * 1.35)
+                    }
+                    Text(String(format: "%02d", raw))
+                        .font(.system(size: glyph, weight: selected ? .semibold : .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(selected ? accent : numeralColor)
+                }
+                .rotationEffect(.degrees(-counterRotation))
+                .position(center)
             }
         }
         .frame(width: diameter, height: diameter)
     }
 
+    /// Selected digits are a little larger, but their outer edge stays inside the tick band.
+    private var selectedNumeralScale: CGFloat { 1.16 }
+
     private var numeralSize: CGFloat {
-        let cap = diameter * (contrast == .increased ? 0.046 : 0.040)
-        return min(max(11, numeralMetric), cap)
+        let gap = (BedsidePlateMetrics.tickInnerMajor - BedsidePlateMetrics.numeralRadius) * radius
+        let maxSize = (gap * 0.72) / selectedNumeralScale
+        let typeSize = min(max(12, numeralMetric), diameter * 0.046)
+        return min(typeSize, maxSize)
+    }
+
+    private var dialFace: Color {
+        dark
+            ? Color(red: 0.090, green: 0.086, blue: 0.078)
+            : Color(red: 0.969, green: 0.953, blue: 0.918)
     }
 
     // MARK: - Reading well
@@ -204,48 +228,22 @@ struct BedsideDisc: View {
     private var readWell: some View {
         let rad = wellAngleDegrees * .pi / 180.0
         let digit = min(wellMetric, wellSize * 0.46)
-        return ZStack {
-            Capsule()
-                .fill(accent.opacity(contrast == .increased ? 0.9 : 0.55))
-                .frame(width: 1.1, height: radius * 0.12)
-                .rotationEffect(.degrees(wellAngleDegrees + 90))
-                .position(point(rad: rad, r: radius * (wellRadiusFraction + 0.14)))
-
-            VStack(spacing: 0) {
-                Text(String(format: "%02d", value))
-                    .font(.system(size: digit, weight: .light))
-                    .monospacedDigit()
-                    .foregroundStyle(wellInk)
-                    .contentTransition(.numericText(value: Double(value)))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text(unitLabel.uppercased())
-                    .font(.system(size: max(8, wellSize * 0.14), weight: .semibold))
-                    .tracking(1.3)
-                    .foregroundStyle(wellCaption)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .frame(width: wellSize, height: wellSize)
-            .background {
-                Circle()
-                    .fill(wellFill.shadow(.inner(color: Color.black.opacity(dark ? 0.55 : 0.18), radius: 5, y: 2)))
-                    .overlay(
-                        Circle().strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(dark ? 0.16 : 0.7),
-                                    Color.black.opacity(dark ? 0.35 : 0.08)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 0.8
-                        )
-                    )
-            }
-            .position(point(rad: rad, r: radius * wellRadiusFraction))
+        return VStack(spacing: 2) {
+            Text(String(format: "%02d", value))
+                .font(.system(size: digit, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(wellInk)
+                .contentTransition(.numericText(value: Double(value)))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(unitLabel.uppercased())
+                .font(.system(size: max(9, digit * 0.26), weight: .semibold))
+                .tracking(1.4)
+                .foregroundStyle(wellCaption)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
+        .position(point(rad: rad, r: radius * wellRadiusFraction))
         .allowsHitTesting(false)
     }
 
@@ -266,12 +264,6 @@ struct BedsideDisc: View {
 
     private var tickMinor: Color {
         tickMajor.opacity(contrast == .increased ? 0.7 : 0.55)
-    }
-
-    private var wellFill: Color {
-        dark
-            ? Color(red: 0.06, green: 0.055, blue: 0.05)
-            : Color(red: 0.90, green: 0.875, blue: 0.835)
     }
 
     private var wellInk: Color {

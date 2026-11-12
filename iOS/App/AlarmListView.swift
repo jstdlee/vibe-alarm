@@ -10,7 +10,8 @@ public struct AlarmListView: View {
     @Environment(\.vibeTokens) private var tokens
     @State private var editing: EditingTarget?
     @ScaledMetric(relativeTo: .title) private var timeSize: CGFloat = 34
-    @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 64
+    @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 34
+    @ScaledMetric(relativeTo: .title) private var bedsideTimeSize: CGFloat = 40
 
     public init(viewModel: AppViewModel) {
         self.viewModel = viewModel
@@ -70,7 +71,7 @@ public struct AlarmListView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Text("Alarms")
-                            .font(.largeTitle.weight(.medium))
+                            .font(.system(size: 32, weight: .semibold))
                             .foregroundStyle(tokens.ink)
                         Spacer()
                         Button {
@@ -87,39 +88,42 @@ public struct AlarmListView: View {
                     }
                     .padding(.top, 8)
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text(tomorrowDateCaption)
-                            .font(.subheadline)
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(tokens.inkSoft)
-                        Text(bedsideHeroTime)
-                            .font(.system(size: heroSize, weight: tokens.timeWeight, design: tokens.timeDesign))
+                        Text(bedsideHeroTitle)
+                            .font(.system(size: heroSize, weight: .medium))
                             .monospacedDigit()
-                            .foregroundStyle(tomorrowWillRing ? tokens.ink : tokens.inkFaint)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
+                            .foregroundStyle(tokens.ink)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.6)
+                            .padding(.top, 6)
                         Text(bedsideHeroDetail)
-                            .font(.body)
-                            .foregroundStyle(tokens.inkSoft)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(tokens.ink)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .padding(.top, 6)
                     }
                     .padding(.top, 20)
                     .accessibilityElement(children: .combine)
 
-                    quickActions
-                        .padding(.top, 20)
+                    bedsideQuickActions
+                        .padding(.top, 18)
+
+                    Text(bedsideNote)
+                        .font(.system(size: 12))
+                        .foregroundStyle(tokens.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 10)
 
                     VStack(spacing: 0) {
-                        Rectangle().fill(tokens.hairline).frame(height: 0.5)
                         ForEach(viewModel.alarmRows) { row in
-                            alarmRow(row)
-                            Rectangle().fill(tokens.hairline).frame(height: 0.5)
+                            bedsideAlarmRow(row)
                         }
                     }
-                    .padding(.top, 28)
-
-                    Text(tomorrowFooter)
-                        .font(.footnote)
-                        .foregroundStyle(tokens.inkFaint)
-                        .padding(.top, 24)
+                    .padding(.top, 18)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
@@ -130,19 +134,157 @@ public struct AlarmListView: View {
         .tint(tokens.accent)
     }
 
-    private var bedsideHeroTime: String {
-        guard tomorrowWillRing, let day = primaryTomorrow else { return "Off" }
-        return day.effectiveTime ?? day.baseTime
+    /// "Quiet tomorrow" when nothing rings, otherwise the time that will.
+    private var bedsideHeroTitle: String {
+        guard let day = primaryTomorrow else { return "All off" }
+        if day.status.isRinging {
+            return day.effectiveTime ?? day.baseTime
+        }
+        return "Quiet tomorrow"
     }
 
     private var bedsideHeroDetail: String {
-        guard let row = viewModel.alarmRows.first(where: { $0.rule.isEnabled }) else {
-            return "All alarms are off"
+        guard let day = primaryTomorrow else { return "All alarms are off" }
+        switch day.status {
+        case .skippedByHoliday(let reason), .skippedByPersonalLeave(let reason):
+            return reason
+        case .skippedManually:
+            return "Skipped"
+        case .noAlarm:
+            return "No alarm"
+        case .delayed(let minutes):
+            return "Delayed \(minutes) min"
+        case .scheduled:
+            return viewModel.alarmRows.first(where: { $0.rule.isEnabled })?.rule.label ?? "Ringing"
         }
-        if row.tomorrow.status.isRinging {
-            return row.rule.label
+    }
+
+    private var bedsideNote: String {
+        if !tomorrowWillRing {
+            return "Nothing rings tomorrow, so Skip and +10 min stay off. Restore appears after a skip or delay."
         }
-        return AlarmFormatting.shortReason(row.tomorrow)
+        if hasOverride {
+            return "Restore clears the skip or delay on tomorrow."
+        }
+        return "Skip and +10 min change tomorrow only. Restore appears after a skip or delay."
+    }
+
+    private var bedsideQuickActions: some View {
+        HStack(spacing: 8) {
+            bedsideKey(title: "Skip", enabled: tomorrowWillRing) {
+                viewModel.performTomorrowOverride(.skipTomorrow)
+            }
+            bedsideKey(title: "+10 min", enabled: tomorrowWillRing) {
+                viewModel.incrementTomorrowDelay(by: 10)
+            }
+            bedsideKey(title: "Restore", enabled: hasOverride) {
+                viewModel.performTomorrowOverride(.none)
+            }
+        }
+    }
+
+    private func bedsideKey(title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            action()
+        } label: {
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(enabled ? tokens.ink : tokens.inkFaint)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .background {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(tokens.well.opacity(enabled ? 1 : 0.85))
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityHint(actionHint(title: title, enabled: enabled))
+    }
+
+    private func bedsideAlarmRow(_ row: AlarmRow) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Button {
+                editing = EditingTarget(id: row.id)
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(row.rule.formattedBaseTime)
+                        .font(.system(size: bedsideTimeSize, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(row.rule.isEnabled ? tokens.ink : tokens.inkFaint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(row.rule.label)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(tokens.ink)
+                        .lineLimit(2)
+                        .padding(.top, 8)
+                    Text(AlarmFormatting.repeatSummary(row.rule))
+                        .font(.system(size: 13))
+                        .foregroundStyle(tokens.inkSoft)
+                        .lineLimit(2)
+                        .padding(.top, 3)
+                    Text("Today \(AlarmFormatting.dayStateText(row.today)) · tomorrow \(bedsideTomorrowPhrase(row.tomorrow))")
+                        .font(.system(size: 13))
+                        .foregroundStyle(tokens.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(row.rule.label), \(row.rule.formattedBaseTime)")
+            .accessibilityValue("Today \(AlarmFormatting.dayStateText(row.today)). Tomorrow \(AlarmFormatting.dayStateText(row.tomorrow)).")
+            .accessibilityHint("Edits this alarm")
+
+            Toggle(isOn: Binding(
+                get: { row.rule.isEnabled },
+                set: { isOn in
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    viewModel.setAlarmEnabled(id: row.id, isEnabled: isOn)
+                }
+            )) {
+                Text("Enabled")
+            }
+            .labelsHidden()
+            .tint(tokens.accent)
+            .accessibilityLabel("\(row.rule.label) enabled")
+        }
+        .padding(.vertical, 14)
+        .overlay(alignment: .top) {
+            Rectangle().fill(tokens.hairline).frame(height: 0.5)
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                viewModel.removeAlarm(id: row.id)
+            } label: {
+                Label("Delete Alarm", systemImage: "trash")
+            }
+        }
+        .swipeActions {
+            Button(role: .destructive) {
+                viewModel.removeAlarm(id: row.id)
+            } label: {
+                Label("Delete Alarm", systemImage: "trash")
+            }
+        }
+    }
+
+    private func bedsideTomorrowPhrase(_ day: ResolvedDayAlarm) -> String {
+        switch day.status {
+        case .scheduled:
+            return day.effectiveTime ?? day.baseTime
+        case .delayed(let minutes):
+            return "delayed \(minutes) min"
+        case .skippedManually, .skippedByHoliday, .skippedByPersonalLeave:
+            return "skipped"
+        case .noAlarm:
+            return "off"
+        }
     }
 
     // MARK: - Tomorrow

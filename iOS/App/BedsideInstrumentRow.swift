@@ -33,6 +33,12 @@ struct BedsideWakeOptions: View {
             repeatRow
             skipRow
             snoozeRow
+            Text(skipRule)
+                .font(.system(size: 12))
+                .foregroundStyle(tokens.inkSoft)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 2)
         }
     }
 
@@ -52,8 +58,8 @@ struct BedsideWakeOptions: View {
             }
             .frame(height: 44)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { plate }
     }
@@ -68,7 +74,7 @@ struct BedsideWakeOptions: View {
             .frame(maxWidth: .infinity, minHeight: 44)
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(on ? accent : tokens.paper)
+                    .fill(on ? accent : tokens.well)
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: on)
             .accessibilityElement(children: .ignore)
@@ -166,7 +172,7 @@ struct BedsideWakeOptions: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(on ? accent : tokens.paper)
+                        .fill(on ? accent : tokens.well)
                 }
         }
         .buttonStyle(.plain)
@@ -192,8 +198,8 @@ struct BedsideWakeOptions: View {
                 label("Snooze")
                 Spacer(minLength: 8)
                 Text("\(snoozeMinutes) min")
-                    .font(.body.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(tokens.ink)
+                    .font(.system(size: 13, weight: .medium).monospacedDigit())
+                    .foregroundStyle(accent)
                     .accessibilityHidden(true)
             }
             HStack(spacing: 6) {
@@ -207,6 +213,19 @@ struct BedsideWakeOptions: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { plate }
         .accessibilityElement(children: .contain)
+    }
+
+    private var skipRule: String {
+        switch (skipPublicHolidays, skipPersonalLeave) {
+        case (true, true):
+            return "Stays quiet on public holidays and personal leave, and rings on makeup workdays."
+        case (true, false):
+            return "Stays quiet on public holidays, and rings on makeup workdays."
+        case (false, true):
+            return "Stays quiet on personal leave."
+        case (false, false):
+            return "Rings on every selected day."
+        }
     }
 
     private func snoozeKey(_ minutes: Int) -> some View {
@@ -224,7 +243,7 @@ struct BedsideWakeOptions: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(selected ? accent : tokens.paper)
+                        .fill(selected ? accent : tokens.well)
                 }
         }
         .buttonStyle(.plain)
@@ -234,14 +253,14 @@ struct BedsideWakeOptions: View {
 
     private var selectedInk: Color {
         scheme == .dark
-            ? Color(red: 0.16, green: 0.12, blue: 0.07)
-            : Color.white
+            ? Color(red: 0.102, green: 0.078, blue: 0.047)
+            : Color(red: 1.0, green: 0.973, blue: 0.933)
     }
 
     private func label(_ text: String) -> some View {
         Text(text)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(tokens.inkSoft)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(tokens.ink)
             .lineLimit(1)
             .accessibilityAddTraits(.isHeader)
     }
